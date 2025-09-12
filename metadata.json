@@ -1,0 +1,7 @@
+{
+  "name": "FixDesk AI",
+  "description": "An intelligent IT support assistant that learns from staff issues, automatically resolves common problems, and generates support tickets with full documentation — reducing load on IT teams while improving issue resolution speed across the company.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
