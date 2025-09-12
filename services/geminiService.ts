@@ -145,7 +145,6 @@ export const startConversation = async (videoBlob: Blob, userPrompt: string): Pr
 
     const base64Video = await blobToBase64(videoBlob);
     
-    // FIX: The 'sendMessage' method expects a 'message' property containing the parts, not a 'parts' property directly.
     const response = await chat.sendMessage({
       message: [
         { text: `User's problem description: "${userPrompt}"` },

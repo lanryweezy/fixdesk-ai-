@@ -3,6 +3,19 @@ import { startConversation, continueConversation, AnalysisResult, ConversationRe
 import { Ticket, TicketStatus } from '../types';
 import { ComputerDesktopIcon, BrainCircuit, CheckCircleIcon, XCircleIcon } from './icons/Icons';
 
+// Define the structure of the API exposed by the preload script
+interface ElectronApi {
+    getScreenSources: (opts: { types: Array<'screen' | 'window'> }) => Promise<Electron.DesktopCapturerSource[]>;
+}
+
+// Extend the Window interface to include the electronAPI
+declare global {
+    interface Window {
+        electronAPI: ElectronApi;
+    }
+}
+
+
 type ModalStep = 'initial' | 'recording' | 'processing' | 'result' | 'clarification';
 
 interface ReportIssueModalProps {
@@ -49,7 +62,30 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
 
   const startRecording = useCallback(async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      if (!window.electronAPI) {
+          throw new Error("Electron API is not available. This feature only works in the desktop app.");
+      }
+
+      const sources = await window.electronAPI.getScreenSources({ types: ['screen', 'window'] });
+
+      // For this example, we'll automatically select the first screen.
+      // A real-world app might present a UI for the user to choose.
+      const primarySource = sources.find(source => source.id.startsWith('screen:'));
+
+      if (!primarySource) {
+          throw new Error("No screen to record was found.");
+      }
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: false, // Audio capture via this method is complex, disabling for now.
+        video: {
+          mandatory: {
+            chromeMediaSource: 'desktop',
+            chromeMediaSourceId: primarySource.id,
+          }
+        } as any // Use `any` to bypass strict type checking for `mandatory`
+      });
+
       setStep('recording');
       setStream(mediaStream);
       
@@ -85,9 +121,8 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
       mediaRecorderRef.current.start();
     } catch (err) {
       console.error("Error starting screen recording.", err);
-      if ((err as DOMException).name !== 'NotAllowedError') {
-        alert("Could not start screen recording. Please check permissions and try again.");
-      }
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
+      alert(`Could not start screen recording: ${errorMessage}`);
       setStep('initial');
     }
   }, [prompt, handleStopButtonClick]);
