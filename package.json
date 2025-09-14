@@ -10,15 +10,18 @@
     "dev:electron": "tsc -p tsconfig.electron.json && wait-on tcp:5173 && electron .",
     "build": "npm run build:vite && tsc -p tsconfig.electron.json && electron-builder",
     "build:vite": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "electron-rebuild"
   },
   "dependencies": {
     "@google/genai": "latest",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "recharts": "^3.1.2"
+    "recharts": "^3.1.2",
+    "robotjs": "^0.6.0"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.1",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.2",
     "concurrently": "^9.2.1",

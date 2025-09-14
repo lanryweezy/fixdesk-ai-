@@ -1,15 +1,16 @@
 import React from 'react';
-import { ChartBarIcon, TicketIcon, BrainCircuit, ComputerDesktopIcon } from './icons/Icons';
+import { ChartBarIcon, TicketIcon, BrainCircuit, ComputerDesktopIcon, ShieldCheckIcon } from './icons/Icons';
 
 interface SidebarProps {
   currentPage: string;
-  setPage: (page: 'dashboard' | 'tickets') => void;
+  setPage: (page: 'dashboard' | 'tickets' | 'remote') => void;
   onReportIssue: () => void;
 }
 
 const navItems = [
   { name: 'Dashboard', icon: ChartBarIcon, page: 'dashboard' },
   { name: 'My Tickets', icon: TicketIcon, page: 'tickets' },
+  { name: 'Remote Control', icon: ShieldCheckIcon, page: 'remote' },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReportIssue }) => {
@@ -37,7 +38,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
-                    setPage(item.page as 'dashboard' | 'tickets');
+                    setPage(item.page as 'dashboard' | 'tickets' | 'remote');
                   }}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-base font-medium transition-colors ${
                     currentPage === item.page

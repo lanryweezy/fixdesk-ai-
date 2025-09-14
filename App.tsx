@@ -6,11 +6,12 @@ import { Dashboard } from './components/Dashboard';
 import { TicketsList } from './components/TicketsList';
 import { TicketDetail } from './components/TicketDetail';
 import { ReportIssueModal } from './components/ReportIssueModal';
+import { RemoteControlView } from './components/RemoteControlView';
 import { Ticket } from './types';
 import { mockTickets } from './constants';
 import { BrainCircuit } from './components/icons/Icons';
 
-type Page = 'dashboard' | 'tickets';
+type Page = 'dashboard' | 'tickets' | 'remote';
 
 export default function App() {
   const [page, setPage] = useState<Page>('dashboard');
@@ -48,6 +49,8 @@ export default function App() {
         return <Dashboard tickets={tickets} />;
       case 'tickets':
         return <TicketsList tickets={tickets} onSelectTicket={handleSelectTicket} />;
+      case 'remote':
+        return <RemoteControlView />;
       default:
         return <Dashboard tickets={tickets} />;
     }

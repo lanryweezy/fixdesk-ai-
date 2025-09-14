@@ -1,5 +1,21 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+// Whitelist of valid channels for IPC communication
+const validChannels = [
+    'desktop-capturer-get-sources',
+    'robot-mouse-move',
+    'robot-mouse-click',
+    'robot-key-tap'
+];
+
 contextBridge.exposeInMainWorld('electronAPI', {
+  // Screen recording (invoke for two-way communication)
   getScreenSources: (opts: any) => ipcRenderer.invoke('desktop-capturer-get-sources', opts),
+
+  // Remote control actions (send for one-way communication)
+  send: (channel: string, data: any) => {
+    if (validChannels.includes(channel)) {
+      ipcRenderer.send(channel, data);
+    }
+  },
 });

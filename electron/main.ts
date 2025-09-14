@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, desktopCapturer } from 'electron'
 import * as path from 'node:path'
+import robot from 'robotjs'
 
 // The built directory structure
 //
@@ -65,5 +66,19 @@ app.on('activate', () => {
 ipcMain.handle('desktop-capturer-get-sources', (event, opts: any) => {
     return desktopCapturer.getSources(opts)
 })
+
+// --- RobotJS Handlers ---
+ipcMain.on('robot-mouse-move', (event, { x, y }) => {
+  robot.moveMouse(x, y);
+});
+
+ipcMain.on('robot-mouse-click', (event) => {
+  robot.mouseClick();
+});
+
+ipcMain.on('robot-key-tap', (event, key) => {
+  robot.keyTap(key);
+});
+
 
 app.whenReady().then(createWindow)
