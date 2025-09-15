@@ -7,11 +7,12 @@ import { TicketsList } from './components/TicketsList';
 import { TicketDetail } from './components/TicketDetail';
 import { ReportIssueModal } from './components/ReportIssueModal';
 import { RemoteControlView } from './components/RemoteControlView';
+import { StartRemoteSession } from './components/StartRemoteSession';
 import { Ticket } from './types';
 import { mockTickets } from './constants';
 import { BrainCircuit } from './components/icons/Icons';
 
-type Page = 'dashboard' | 'tickets' | 'remote';
+type Page = 'dashboard' | 'tickets' | 'remote' | 'start-remote-session';
 
 export default function App() {
   const [page, setPage] = useState<Page>('dashboard');
@@ -51,6 +52,8 @@ export default function App() {
         return <TicketsList tickets={tickets} onSelectTicket={handleSelectTicket} />;
       case 'remote':
         return <RemoteControlView />;
+      case 'start-remote-session':
+        return <StartRemoteSession />;
       default:
         return <Dashboard tickets={tickets} />;
     }

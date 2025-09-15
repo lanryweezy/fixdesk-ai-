@@ -1,74 +1,135 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import Peer from 'simple-peer';
 
 export const RemoteControlView: React.FC = () => {
-  const viewRef = useRef<HTMLDivElement>(null);
+    const [offer, setOffer] = useState('');
+    const [answer, setAnswer] = useState('');
+    const [isConnected, setIsConnected] = useState(false);
+    const peerRef = useRef<Peer.Instance | null>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const viewRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
+    const handleAcceptOffer = () => {
+        try {
+            const peer = new Peer({
+                initiator: false,
+                trickle: false,
+            });
 
-    const handleMouseMove = (e: MouseEvent) => {
-      if (document.pointerLockElement === view) {
-        // In a real app, you'd scale these coordinates to the remote screen size
-        window.electronAPI.send('robot-mouse-move', { x: e.movementX, y: e.movementY });
-      }
-    };
+            peer.on('signal', (data) => {
+                setAnswer(JSON.stringify(data));
+            });
 
-    const handleClick = () => {
-      if (document.pointerLockElement !== view) {
-        view.requestPointerLock();
-      } else {
-        window.electronAPI.send('robot-mouse-click', null);
-      }
-    };
+            peer.on('stream', (stream) => {
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                }
+            });
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // This is a simplified example. A real implementation would need to handle
-      // special keys, modifiers (shift, ctrl, etc.), and different keyboard layouts.
-      e.preventDefault();
-      window.electronAPI.send('robot-key-tap', e.key);
-    };
+            peer.on('connect', () => {
+                setIsConnected(true);
+            });
 
-    const handlePointerLockChange = () => {
-        if (document.pointerLockElement === view) {
-            document.addEventListener("keydown", handleKeyDown, false);
-        } else {
-            document.removeEventListener("keydown", handleKeyDown, false);
+            peer.on('close', () => {
+                setIsConnected(false);
+                peerRef.current = null;
+            });
+
+            peer.on('error', (err) => {
+                console.error('Peer connection error:', err);
+                alert('Connection error: ' + err.message);
+                setIsConnected(false);
+            });
+
+            peer.signal(JSON.parse(offer));
+            peerRef.current = peer;
+
+        } catch (error) {
+            alert("Invalid offer format. Please ensure you've copied it correctly.");
+            console.error("Error accepting offer:", error);
         }
+    };
+
+    const sendCommand = (channel: string, payload: any) => {
+        if (peerRef.current && isConnected) {
+            peerRef.current.send(JSON.stringify({ channel, payload }));
+        }
+    };
+
+    useEffect(() => {
+        const view = viewRef.current;
+        if (!view || !isConnected) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const { left, top, width, height } = view.getBoundingClientRect();
+            const x = (e.clientX - left) / width;
+            const y = (e.clientY - top) / height;
+            sendCommand('robot-mouse-move', { x, y });
+        };
+
+        const handleClick = () => {
+            sendCommand('robot-mouse-click', null);
+        };
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            e.preventDefault();
+            sendCommand('robot-key-tap', e.key);
+        };
+
+        view.addEventListener('mousemove', handleMouseMove);
+        view.addEventListener('click', handleClick);
+        window.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            view.removeEventListener('mousemove', handleMouseMove);
+            view.removeEventListener('click', handleClick);
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isConnected]);
+
+    if (isConnected) {
+        return (
+             <div className="w-full h-full bg-gray-900 text-white flex flex-col items-center justify-center">
+                <h2 className="text-2xl font-bold mb-4">Remote Control Session Active</h2>
+                <video ref={videoRef} autoPlay className="w-full max-w-5xl aspect-video bg-black" />
+            </div>
+        )
     }
 
-    view.addEventListener('mousemove', handleMouseMove);
-    view.addEventListener('click', handleClick);
-    document.addEventListener('pointerlockchange', handlePointerLockChange, false);
+    return (
+        <div className="p-8 font-sans">
+            <h1 className="text-2xl font-bold mb-4">Accept Remote Session</h1>
+            <div className="space-y-6">
+                <div>
+                    <h2 className="text-lg font-semibold">Step 1: Paste User's Offer</h2>
+                    <textarea
+                        value={offer}
+                        onChange={(e) => setOffer(e.target.value)}
+                        className="w-full h-32 p-2 mt-1 border rounded"
+                        placeholder="Paste the offer from the user here..."
+                    />
+                    <button
+                        onClick={handleAcceptOffer}
+                        disabled={!offer || !!answer}
+                        className="mt-2 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400"
+                    >
+                        Accept & Generate Answer
+                    </button>
+                </div>
 
-
-    return () => {
-      view.removeEventListener('mousemove', handleMouseMove);
-      view.removeEventListener('click', handleClick);
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('pointerlockchange', handlePointerLockChange);
-    };
-  }, []);
-
-  return (
-    <div className="w-full h-full bg-gray-800 text-white flex flex-col items-center justify-center font-sans">
-      <h2 className="text-2xl font-bold mb-4">Remote Control Session</h2>
-      <div
-        ref={viewRef}
-        className="w-full max-w-5xl aspect-video bg-black border-2 border-dashed border-gray-600 flex flex-col items-center justify-center cursor-pointer"
-        tabIndex={0} // Make it focusable
-      >
-        <p className="text-gray-300 text-lg">Click here to start controlling the remote machine.</p>
-        <p className="text-gray-500 text-sm mt-2">(Press 'Esc' to release control)</p>
-      </div>
-       <div className="mt-4 p-4 bg-gray-900 rounded-lg text-sm max-w-5xl w-full">
-            <h3 className="font-bold mb-2">Instructions:</h3>
-            <ul className="list-disc list-inside text-gray-400">
-                <li>Click on the black screen area to capture your mouse and keyboard.</li>
-                <li>Once captured, your inputs will be sent to the remote machine.</li>
-                <li>Press the `Esc` key to release control and return to the application.</li>
-            </ul>
+                {answer && (
+                    <div>
+                        <h2 className="text-lg font-semibold">Step 2: Send Answer to User</h2>
+                        <p className="text-sm text-gray-600">Copy this answer and send it back to the user:</p>
+                        <textarea
+                            readOnly
+                            value={answer}
+                            className="w-full h-32 p-2 mt-1 border rounded bg-gray-100"
+                            onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+                        />
+                    </div>
+                )}
+            </div>
         </div>
-    </div>
-  );
+    );
 };
