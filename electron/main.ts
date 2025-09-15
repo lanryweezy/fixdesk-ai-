@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain, desktopCapturer } from 'electron'
 import * as path from 'node:path'
 import robot from 'robotjs'
+import { JSONFilePreset, Low } from 'lowdb/node'
+import type { Ticket } from '../types'
 
 // The built directory structure
 //
@@ -19,6 +21,19 @@ process.env.VITE_PUBLIC = process.env.VITE_DEV_SERVER_URL
 let win: BrowserWindow | null
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
+
+// --- Database Setup ---
+type Data = {
+  tickets: Ticket[];
+}
+let db: Low<Data>;
+const initDatabase = async () => {
+    const defaultData: Data = { tickets: [] };
+    const dbPath = path.join(app.getPath('userData'), 'db.json');
+    db = await JSONFilePreset<Data>(dbPath, defaultData);
+}
+// --- End Database Setup ---
+
 
 function createWindow() {
   win = new BrowserWindow({
@@ -67,9 +82,28 @@ ipcMain.handle('desktop-capturer-get-sources', (event, opts: any) => {
     return desktopCapturer.getSources(opts)
 })
 
+// --- Database Handlers ---
+ipcMain.handle('db-get-tickets', () => {
+    return db.data.tickets;
+});
+
+ipcMain.handle('db-create-ticket', async (event, ticket) => {
+    db.data.tickets.push(ticket);
+    await db.write();
+    return ticket;
+});
+
+ipcMain.handle('db-get-ticket-by-id', (event, ticketId) => {
+    return db.data.tickets.find(t => t.id === ticketId);
+});
+// --- End Database Handlers ---
+
 // --- RobotJS Handlers ---
 ipcMain.on('robot-mouse-move', (event, { x, y }) => {
-  robot.moveMouse(x, y);
+  const { width, height } = robot.getScreenSize();
+  const absoluteX = Math.round(x * width);
+  const absoluteY = Math.round(y * height);
+  robot.moveMouse(absoluteX, absoluteY);
 });
 
 ipcMain.on('robot-mouse-click', (event) => {
@@ -81,4 +115,4 @@ ipcMain.on('robot-key-tap', (event, key) => {
 });
 
 
-app.whenReady().then(createWindow)
+app.whenReady().then(initDatabase).then(createWindow)

@@ -37,6 +37,7 @@ export const RemoteControlView: React.FC = () => {
 
             peer.on('error', (err) => {
                 console.error('Peer connection error:', err);
+                // TODO: Replace with a more robust notification system
                 alert('Connection error: ' + err.message);
                 setIsConnected(false);
             });
@@ -45,6 +46,7 @@ export const RemoteControlView: React.FC = () => {
             peerRef.current = peer;
 
         } catch (error) {
+            // TODO: Replace with a more robust notification system
             alert("Invalid offer format. Please ensure you've copied it correctly.");
             console.error("Error accepting offer:", error);
         }
@@ -89,9 +91,10 @@ export const RemoteControlView: React.FC = () => {
 
     if (isConnected) {
         return (
-             <div className="w-full h-full bg-gray-900 text-white flex flex-col items-center justify-center">
+             <div ref={viewRef} tabIndex={0} className="w-full h-full bg-gray-900 text-white flex flex-col items-center justify-center focus:outline-none">
                 <h2 className="text-2xl font-bold mb-4">Remote Control Session Active</h2>
-                <video ref={videoRef} autoPlay className="w-full max-w-5xl aspect-video bg-black" />
+                <p className="text-sm text-gray-400 mb-2">(Your mouse and keyboard are now controlling the remote machine)</p>
+                <video ref={videoRef} autoPlay className="w-full max-w-5xl aspect-video bg-black cursor-crosshair" />
             </div>
         )
     }

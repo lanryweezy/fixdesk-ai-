@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Ticket, TicketStatus } from '../types';
 import { Card } from './common/Card';
 import { ArrowUturnLeftIcon, CogIcon, SpinnerIcon } from './icons/Icons';
 
 interface TicketDetailProps {
-  ticket: Ticket;
+  ticketId: string;
   onBack: () => void;
 }
 
@@ -23,16 +23,53 @@ const StatusBadge: React.FC<{ status: TicketStatus }> = ({ status }) => {
   </span>;
 };
 
-export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onBack }) => {
-  const { 
-    id, title, description, status, reportedBy, assignedTo, createdAt, resolution, logs, videoUrl 
-  } = ticket;
+export const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
+  const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isRequesting, setIsRequesting] = useState(false);
+
+  useEffect(() => {
+    const fetchTicket = async () => {
+      setIsLoading(true);
+      const fetchedTicket = await window.electronAPI.getTicketById(ticketId);
+      setTicket(fetchedTicket || null);
+      setIsLoading(false);
+    };
+    fetchTicket();
+  }, [ticketId]);
 
   const handleRequestAssistance = () => {
     setIsRequesting(true);
     // In a real application, an API call would be made here.
   };
+
+  if (isLoading) {
+    return (
+        <div className="flex justify-center items-center h-64">
+            <SpinnerIcon className="w-8 h-8 text-brand-primary" />
+        </div>
+    );
+  }
+
+  if (!ticket) {
+    return (
+        <div className="text-center">
+            <h2 className="text-2xl font-bold text-red-600">Ticket Not Found</h2>
+            <p className="text-slate-500 mt-2">The ticket with ID {ticketId} could not be found.</p>
+            <button
+                onClick={onBack}
+                className="mt-6 flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-brand-primary transition-colors"
+            >
+                <ArrowUturnLeftIcon className="w-5 h-5" />
+                Back to all tickets
+            </button>
+        </div>
+    );
+  }
+
+  const {
+    id, title, description, status, reportedBy, assignedTo, createdAt, resolution, logs, videoUrl
+  } = ticket;
 
   return (
     <div className="max-w-4xl mx-auto">

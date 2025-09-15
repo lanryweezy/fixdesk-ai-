@@ -12,6 +12,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Screen recording (invoke for two-way communication)
   getScreenSources: (opts: any) => ipcRenderer.invoke('desktop-capturer-get-sources', opts),
 
+  // Database operations
+  getTickets: () => ipcRenderer.invoke('db-get-tickets'),
+  createTicket: (ticket: any) => ipcRenderer.invoke('db-create-ticket', ticket),
+  getTicketById: (id: string) => ipcRenderer.invoke('db-get-ticket-by-id', id),
+
   // Remote control actions (send for one-way communication)
   send: (channel: string, data: any) => {
     if (validChannels.includes(channel)) {

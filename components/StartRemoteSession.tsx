@@ -1,19 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Peer from 'simple-peer';
 
-// Define the structure of the API exposed by the preload script
-interface ElectronApi {
-    getScreenSources: (opts: { types: Array<'screen' | 'window'> }) => Promise<Electron.DesktopCapturerSource[]>;
-    send: (channel: string, data: any) => void;
-}
-
-// Extend the Window interface to include the electronAPI
-declare global {
-    interface Window {
-        electronAPI: ElectronApi;
-    }
-}
-
 export const StartRemoteSession: React.FC = () => {
     const [offer, setOffer] = useState('');
     const [answer, setAnswer] = useState('');
@@ -69,6 +56,7 @@ export const StartRemoteSession: React.FC = () => {
 
             peer.on('error', (err) => {
                 console.error('Peer connection error:', err);
+                // TODO: Replace with a more robust notification system
                 alert('Connection error: ' + err.message);
                 setIsConnected(false);
             });
@@ -77,6 +65,7 @@ export const StartRemoteSession: React.FC = () => {
 
         } catch (error) {
             console.error("Error generating offer:", error);
+            // TODO: Replace with a more robust notification system
             alert("Could not start remote session: " + (error as Error).message);
         }
     };
@@ -86,6 +75,7 @@ export const StartRemoteSession: React.FC = () => {
             try {
                 peerRef.current.signal(JSON.parse(answer));
             } catch (error) {
+                // TODO: Replace with a more robust notification system
                 alert("Invalid answer format. Please ensure you've copied it correctly.");
                 console.error("Error signaling answer:", error);
             }

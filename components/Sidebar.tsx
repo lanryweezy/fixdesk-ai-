@@ -1,9 +1,10 @@
 import React from 'react';
+import { Page } from '../App';
 import { ChartBarIcon, TicketIcon, BrainCircuit, ComputerDesktopIcon, ShieldCheckIcon, UserGroupIcon } from './icons/Icons';
 
 interface SidebarProps {
   currentPage: string;
-  setPage: (page: 'dashboard' | 'tickets' | 'remote' | 'start-remote-session') => void;
+  setPage: (page: Page) => void;
   onReportIssue: () => void;
 }
 
@@ -42,7 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
-                    setPage(item.page as any);
+                    setPage(item.page);
                   }}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-base font-medium transition-colors ${
                     currentPage === item.page
@@ -66,7 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
                         href="#"
                         onClick={(e) => {
                             e.preventDefault();
-                            setPage(item.page as any);
+                            setPage(item.page);
                         }}
                         className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-base font-medium transition-colors ${
                             currentPage === item.page

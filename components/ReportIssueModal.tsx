@@ -3,18 +3,6 @@ import { startConversation, continueConversation, AnalysisResult, ConversationRe
 import { Ticket, TicketStatus } from '../types';
 import { ComputerDesktopIcon, BrainCircuit, CheckCircleIcon, XCircleIcon } from './icons/Icons';
 
-// Define the structure of the API exposed by the preload script
-interface ElectronApi {
-    getScreenSources: (opts: { types: Array<'screen' | 'window'> }) => Promise<Electron.DesktopCapturerSource[]>;
-}
-
-// Extend the Window interface to include the electronAPI
-declare global {
-    interface Window {
-        electronAPI: ElectronApi;
-    }
-}
-
 
 type ModalStep = 'initial' | 'recording' | 'processing' | 'result' | 'clarification';
 
