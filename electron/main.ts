@@ -1,8 +1,10 @@
 import { app, BrowserWindow, ipcMain, desktopCapturer } from 'electron'
 import * as path from 'node:path'
 import robot from 'robotjs'
-import { JSONFilePreset, Low } from 'lowdb/node'
+import { Low } from 'lowdb'
+import { JSONFilePreset } from 'lowdb/node'
 import type { Ticket } from '../types'
+import { exec } from 'child_process'
 
 // The built directory structure
 //
@@ -97,6 +99,19 @@ ipcMain.handle('db-get-ticket-by-id', (event, ticketId) => {
     return db.data.tickets.find(t => t.id === ticketId);
 });
 // --- End Database Handlers ---
+
+// --- Command Execution Handler ---
+ipcMain.handle('execute-command', async (event, command: string) => {
+  return new Promise((resolve) => {
+    exec(command, (error, stdout, stderr) => {
+      resolve({
+        stdout: stdout,
+        stderr: stderr,
+      });
+    });
+  });
+});
+// --- End Command Execution Handler ---
 
 // --- RobotJS Handlers ---
 ipcMain.on('robot-mouse-move', (event, { x, y }) => {

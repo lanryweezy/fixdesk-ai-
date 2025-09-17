@@ -6,6 +6,7 @@ export interface ElectronApi {
     getTickets: () => Promise<Ticket[]>;
     createTicket: (ticket: Ticket) => Promise<Ticket>;
     getTicketById: (id: string) => Promise<Ticket | undefined>;
+    executeCommand: (command: string) => Promise<{ stdout: string; stderr: string }>;
 }
 
 declare global {

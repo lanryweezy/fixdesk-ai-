@@ -18,6 +18,7 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [clarificationQuestion, setClarificationQuestion] = useState('');
   const [userAnswer, setUserAnswer] = useState('');
+  const [isExecutingCommand, setIsExecutingCommand] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
@@ -153,6 +154,25 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
     handleConversationResult(result);
   };
 
+  const handleExecuteCommand = async () => {
+    if (!analysisResult?.suggestedCommand) return;
+
+    setIsExecutingCommand(true);
+    try {
+        const { stdout, stderr } = await window.electronAPI.executeCommand(analysisResult.suggestedCommand);
+        if (stderr) {
+            alert(`Command failed:\n${stderr}`);
+        } else {
+            alert(`Command executed successfully:\n${stdout}`);
+            // Optionally, you could re-run analysis or mark as resolved here
+        }
+    } catch (error) {
+        alert(`An error occurred while executing the command: ${(error as Error).message}`);
+    } finally {
+        setIsExecutingCommand(false);
+    }
+  };
+
   const renderContent = () => {
     switch (step) {
       case 'initial':
@@ -267,6 +287,19 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
                 <div className="mt-4 text-sm text-green-700 bg-green-50 p-4 rounded-lg text-left">
                     <p className="font-semibold">Suggested Fix:</p>
                     <p>{analysisResult.resolution}</p>
+                </div>
+            )}
+            {analysisResult.suggestedCommand && (
+                 <div className="mt-4 text-sm text-orange-700 bg-orange-50 p-4 rounded-lg text-left">
+                    <p className="font-semibold">Suggested Automated Fix:</p>
+                    <code className="text-xs bg-black/10 p-1 rounded font-mono">{analysisResult.suggestedCommand}</code>
+                    <button
+                        onClick={handleExecuteCommand}
+                        disabled={isExecutingCommand}
+                        className="mt-3 w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm transition-all disabled:bg-gray-400"
+                    >
+                        {isExecutingCommand ? 'Executing...' : 'Attempt Automated Fix'}
+                    </button>
                 </div>
             )}
             <div className="mt-6 flex flex-col sm:flex-row-reverse gap-3">

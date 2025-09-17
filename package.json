@@ -1,7 +1,8 @@
 {
   "name": "fixdesk-ai",
-  "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "AI-Powered IT Support Desktop Application",
+  "author": "Jules",
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -11,7 +12,19 @@
     "build": "npm run build:vite && npx tsc -p tsconfig.electron.json && electron-builder",
     "build:vite": "vite build",
     "preview": "vite preview",
-    "postinstall": "electron-rebuild"
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "build": {
+    "appId": "com.fixdesk.ai",
+    "productName": "FixDesk AI",
+    "files": [
+      "dist/",
+      "dist-electron/",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    }
   },
   "dependencies": {
     "@google/genai": "latest",
