@@ -16,7 +16,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getTickets: () => ipcRenderer.invoke('db-get-tickets'),
   createTicket: (ticket: any) => ipcRenderer.invoke('db-create-ticket', ticket),
   getTicketById: (id: string) => ipcRenderer.invoke('db-get-ticket-by-id', id),
-  executeCommand: (command: string) => ipcRenderer.invoke('execute-command', command),
+  executeCommand: (commands: string[]) => ipcRenderer.invoke('execute-command', commands),
 
   // Remote control actions (send for one-way communication)
   send: (channel: string, data: any) => {

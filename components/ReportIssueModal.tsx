@@ -155,13 +155,13 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
   };
 
   const handleExecuteCommand = async () => {
-    if (!analysisResult?.suggestedCommand) return;
+    if (!analysisResult?.suggestedScript) return;
 
     setIsExecutingCommand(true);
     try {
-        const { stdout, stderr } = await window.electronAPI.executeCommand(analysisResult.suggestedCommand);
+        const { stdout, stderr } = await window.electronAPI.executeCommand(analysisResult.suggestedScript);
         if (stderr) {
-            alert(`Command failed:\n${stderr}`);
+            alert(`Script failed:\n${stderr}`);
         } else {
             alert(`Command executed successfully:\n${stdout}`);
             // Optionally, you could re-run analysis or mark as resolved here
@@ -289,16 +289,20 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
                     <p>{analysisResult.resolution}</p>
                 </div>
             )}
-            {analysisResult.suggestedCommand && (
+            {analysisResult.suggestedScript && analysisResult.suggestedScript.length > 0 && (
                  <div className="mt-4 text-sm text-orange-700 bg-orange-50 p-4 rounded-lg text-left">
-                    <p className="font-semibold">Suggested Automated Fix:</p>
-                    <code className="text-xs bg-black/10 p-1 rounded font-mono">{analysisResult.suggestedCommand}</code>
+                    <p className="font-semibold">Suggested Automated Fix Script:</p>
+                    <div className="mt-2 text-xs bg-black/10 p-2 rounded font-mono space-y-1">
+                        {analysisResult.suggestedScript.map((command, index) => (
+                            <p key={index} className="whitespace-pre-wrap">{`> ${command}`}</p>
+                        ))}
+                    </div>
                     <button
                         onClick={handleExecuteCommand}
                         disabled={isExecutingCommand}
                         className="mt-3 w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm transition-all disabled:bg-gray-400"
                     >
-                        {isExecutingCommand ? 'Executing...' : 'Attempt Automated Fix'}
+                        {isExecutingCommand ? 'Executing Script...' : 'Attempt Automated Fix'}
                     </button>
                 </div>
             )}

@@ -7,7 +7,7 @@ export interface AnalysisResult {
   resolution: string | null;
   status: TicketStatus;
   priority: 'Low' | 'Medium' | 'High';
-  suggestedCommand?: string;
+  suggestedScript?: string[];
 }
 
 export type ConversationResult = {
@@ -67,9 +67,10 @@ const schema = {
             type: Type.STRING,
             description: "If you lack sufficient information for a full analysis, ask one clear and concise question to the user. Omit this field if you have enough information."
         },
-        suggestedCommand: {
-            type: Type.STRING,
-            description: "If a clear, safe, and simple one-line shell command exists to fix the problem (e.g., clearing a cache), provide it here. Otherwise, omit this field."
+        suggestedScript: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "If the resolution can be performed by a sequence of simple, safe shell commands, provide them as an array of strings. Otherwise, omit this field."
         }
     },
 };
@@ -78,7 +79,7 @@ const systemInstruction = `You are "FixDesk AI", an intelligent IT support assis
 
 1.  **Analyze the user's text and video.**
 2.  **Full Analysis:** If you have enough information, diagnose the root cause. Your response MUST be a JSON object with 'title', 'description', 'status', and 'priority'. Include 'resolution' if a clear fix exists.
-3.  **Actionable Command:** If the resolution can be performed by a simple, safe, one-line shell command (like clearing a cache or restarting a service), include it in the 'suggestedCommand' field. Only include commands that are generally safe and non-destructive.
+3.  **Actionable Script:** If the resolution can be performed by a sequence of simple, safe shell commands, include them as an array of strings in the 'suggestedScript' field. Only include commands that are generally safe and non-destructive.
 4.  **Clarifying Question:** If you lack critical information, you MUST ask a single, clear question. Your response MUST be a JSON object containing ONLY the 'clarifyingQuestion' field.
 5.  **Prioritize Analysis:** Do not ask a question if you can make a reasonable inference.
 6.  **Strict JSON Output:** Your entire response must be ONLY a single, valid JSON object that strictly adheres to the provided schema. Do not add any extra text, explanation, or markdown formatting.`;
@@ -115,7 +116,7 @@ const processResponse = (response: GenerateContentResponse): ConversationResult 
                     status: result.status,
                     priority: result.priority,
                     resolution: result.resolution || null,
-                    suggestedCommand: result.suggestedCommand || null,
+                    suggestedScript: result.suggestedScript || null,
                 }
             };
         }

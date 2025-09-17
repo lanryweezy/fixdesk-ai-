@@ -101,15 +101,28 @@ ipcMain.handle('db-get-ticket-by-id', (event, ticketId) => {
 // --- End Database Handlers ---
 
 // --- Command Execution Handler ---
-ipcMain.handle('execute-command', async (event, command: string) => {
-  return new Promise((resolve) => {
-    exec(command, (error, stdout, stderr) => {
-      resolve({
-        stdout: stdout,
-        stderr: stderr,
+ipcMain.handle('execute-command', async (event, commands: string[]) => {
+  const execPromise = (command: string) => {
+    return new Promise<{ stdout: string; stderr: string }>((resolve) => {
+      exec(command, (error, stdout, stderr) => {
+        // We resolve even if there's an error, but we include the stderr.
+        // The renderer process will be responsible for checking the stderr property.
+        resolve({ stdout, stderr });
       });
     });
-  });
+  };
+
+  const results = { stdout: '', stderr: '' };
+  for (const command of commands) {
+    const result = await execPromise(command);
+    results.stdout += result.stdout;
+    results.stderr += result.stderr;
+    // If there was an error in a command, stop executing the rest of the script.
+    if (result.stderr) {
+      break;
+    }
+  }
+  return results;
 });
 // --- End Command Execution Handler ---
 
