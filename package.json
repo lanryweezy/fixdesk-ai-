@@ -1,22 +1,50 @@
 {
   "name": "fixdesk-ai",
-  "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "AI-Powered IT Support Desktop Application",
+  "author": "Jules",
   "type": "module",
+  "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "concurrently \"npm:dev:vite\" \"npm:dev:electron\"",
+    "dev:vite": "vite",
+    "dev:electron": "npx tsc -p tsconfig.electron.json && wait-on tcp:5173 && electron .",
+    "build": "npm run build:vite && npx tsc -p tsconfig.electron.json && electron-builder",
+    "build:vite": "vite build",
+    "preview": "vite preview",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "build": {
+    "appId": "com.fixdesk.ai",
+    "productName": "FixDesk AI",
+    "files": [
+      "dist/",
+      "dist-electron/",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    }
   },
   "dependencies": {
+    "@google/genai": "latest",
+    "lowdb": "^7.0.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "recharts": "^3.1.2",
-    "@google/genai": "latest"
+    "robotjs": "^0.6.0",
+    "simple-peer": "^9.11.1"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.1",
     "@types/node": "^22.14.0",
+    "@types/simple-peer": "^9.11.8",
+    "@vitejs/plugin-react": "^5.0.2",
+    "concurrently": "^9.2.1",
+    "electron": "^38.1.0",
+    "electron-builder": "^26.0.12",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "wait-on": "^8.0.4"
   }
 }

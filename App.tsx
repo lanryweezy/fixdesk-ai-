@@ -1,31 +1,41 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { TicketsList } from './components/TicketsList';
 import { TicketDetail } from './components/TicketDetail';
 import { ReportIssueModal } from './components/ReportIssueModal';
+import { RemoteControlView } from './components/RemoteControlView';
+import { StartRemoteSession } from './components/StartRemoteSession';
 import { Ticket } from './types';
-import { mockTickets } from './constants';
 import { BrainCircuit } from './components/icons/Icons';
 
-type Page = 'dashboard' | 'tickets';
+export type Page = 'dashboard' | 'tickets' | 'remote' | 'start-remote-session';
 
 export default function App() {
   const [page, setPage] = useState<Page>('dashboard');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [tickets, setTickets] = useState<Ticket[]>(mockTickets);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
-  const handleCreateTicket = (newTicket: Omit<Ticket, 'id' | 'createdAt' | 'reportedBy'>) => {
+  useEffect(() => {
+    const fetchTickets = async () => {
+      const storedTickets = await window.electronAPI.getTickets();
+      setTickets(storedTickets);
+    };
+    fetchTickets();
+  }, []);
+
+  const handleCreateTicket = async (newTicket: Omit<Ticket, 'id' | 'createdAt' | 'reportedBy'>) => {
     const ticket: Ticket = {
       ...newTicket,
       id: `TICK-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
       createdAt: new Date().toISOString(),
       reportedBy: 'Alex Smith', // Mocked user
     };
-    setTickets(prevTickets => [ticket, ...prevTickets]);
+    const createdTicket = await window.electronAPI.createTicket(ticket);
+    setTickets(prevTickets => [createdTicket, ...prevTickets]);
     setIsModalOpen(false);
     setPage('tickets');
     setSelectedTicket(ticket);
@@ -48,6 +58,10 @@ export default function App() {
         return <Dashboard tickets={tickets} />;
       case 'tickets':
         return <TicketsList tickets={tickets} onSelectTicket={handleSelectTicket} />;
+      case 'remote':
+        return <RemoteControlView />;
+      case 'start-remote-session':
+        return <StartRemoteSession />;
       default:
         return <Dashboard tickets={tickets} />;
     }

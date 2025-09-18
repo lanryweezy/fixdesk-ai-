@@ -21,6 +21,18 @@ export interface Ticket {
   priority: 'Low' | 'Medium' | 'High';
 }
 
+export interface RecordedAction {
+  type: 'move' | 'click' | 'key';
+  payload: any;
+}
+
+export interface Solution {
+  id: string;
+  problemDescription: string;
+  solutionDescription: string;
+  actions: RecordedAction[];
+}
+
 export interface AnalyticsData {
   totalTickets: number;
   resolvedTickets: number;

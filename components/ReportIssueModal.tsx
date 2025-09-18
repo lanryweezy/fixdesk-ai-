@@ -3,6 +3,7 @@ import { startConversation, continueConversation, AnalysisResult, ConversationRe
 import { Ticket, TicketStatus } from '../types';
 import { ComputerDesktopIcon, BrainCircuit, CheckCircleIcon, XCircleIcon } from './icons/Icons';
 
+
 type ModalStep = 'initial' | 'recording' | 'processing' | 'result' | 'clarification';
 
 interface ReportIssueModalProps {
@@ -17,6 +18,7 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [clarificationQuestion, setClarificationQuestion] = useState('');
   const [userAnswer, setUserAnswer] = useState('');
+  const [isExecutingCommand, setIsExecutingCommand] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
@@ -49,7 +51,30 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
 
   const startRecording = useCallback(async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      if (!window.electronAPI) {
+          throw new Error("Electron API is not available. This feature only works in the desktop app.");
+      }
+
+      const sources = await window.electronAPI.getScreenSources({ types: ['screen', 'window'] });
+
+      // For this example, we'll automatically select the first screen.
+      // A real-world app might present a UI for the user to choose.
+      const primarySource = sources.find(source => source.id.startsWith('screen:'));
+
+      if (!primarySource) {
+          throw new Error("No screen to record was found.");
+      }
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: false, // Audio capture via this method is complex, disabling for now.
+        video: {
+          mandatory: {
+            chromeMediaSource: 'desktop',
+            chromeMediaSourceId: primarySource.id,
+          }
+        } as any // Use `any` to bypass strict type checking for `mandatory`
+      });
+
       setStep('recording');
       setStream(mediaStream);
       
@@ -85,9 +110,8 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
       mediaRecorderRef.current.start();
     } catch (err) {
       console.error("Error starting screen recording.", err);
-      if ((err as DOMException).name !== 'NotAllowedError') {
-        alert("Could not start screen recording. Please check permissions and try again.");
-      }
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
+      alert(`Could not start screen recording: ${errorMessage}`);
       setStep('initial');
     }
   }, [prompt, handleStopButtonClick]);
@@ -128,6 +152,25 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
     setStep('processing');
     const result = await continueConversation(userAnswer);
     handleConversationResult(result);
+  };
+
+  const handleExecuteCommand = async () => {
+    if (!analysisResult?.suggestedScript) return;
+
+    setIsExecutingCommand(true);
+    try {
+        const { stdout, stderr } = await window.electronAPI.executeCommand(analysisResult.suggestedScript);
+        if (stderr) {
+            alert(`Script failed:\n${stderr}`);
+        } else {
+            alert(`Command executed successfully:\n${stdout}`);
+            // Optionally, you could re-run analysis or mark as resolved here
+        }
+    } catch (error) {
+        alert(`An error occurred while executing the command: ${(error as Error).message}`);
+    } finally {
+        setIsExecutingCommand(false);
+    }
   };
 
   const renderContent = () => {
@@ -244,6 +287,23 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
                 <div className="mt-4 text-sm text-green-700 bg-green-50 p-4 rounded-lg text-left">
                     <p className="font-semibold">Suggested Fix:</p>
                     <p>{analysisResult.resolution}</p>
+                </div>
+            )}
+            {analysisResult.suggestedScript && analysisResult.suggestedScript.length > 0 && (
+                 <div className="mt-4 text-sm text-orange-700 bg-orange-50 p-4 rounded-lg text-left">
+                    <p className="font-semibold">Suggested Automated Fix Script:</p>
+                    <div className="mt-2 text-xs bg-black/10 p-2 rounded font-mono space-y-1">
+                        {analysisResult.suggestedScript.map((command, index) => (
+                            <p key={index} className="whitespace-pre-wrap">{`> ${command}`}</p>
+                        ))}
+                    </div>
+                    <button
+                        onClick={handleExecuteCommand}
+                        disabled={isExecutingCommand}
+                        className="mt-3 w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm transition-all disabled:bg-gray-400"
+                    >
+                        {isExecutingCommand ? 'Executing Script...' : 'Attempt Automated Fix'}
+                    </button>
                 </div>
             )}
             <div className="mt-6 flex flex-col sm:flex-row-reverse gap-3">

@@ -7,6 +7,7 @@ export interface AnalysisResult {
   resolution: string | null;
   status: TicketStatus;
   priority: 'Low' | 'Medium' | 'High';
+  suggestedScript?: string[];
 }
 
 export type ConversationResult = {
@@ -65,23 +66,29 @@ const schema = {
         clarifyingQuestion: {
             type: Type.STRING,
             description: "If you lack sufficient information for a full analysis, ask one clear and concise question to the user. Omit this field if you have enough information."
+        },
+        suggestedScript: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "If the resolution can be performed by a sequence of simple, safe shell commands, provide them as an array of strings. Otherwise, omit this field."
         }
     },
 };
 
-const systemInstruction = `You are "FixDesk AI", an intelligent IT support assistant. Your purpose is to analyze user-submitted IT problems and gather enough information to create a structured ticket.
+const systemInstruction = `You are "FixDesk AI", an intelligent IT support assistant. Your purpose is to analyze user-submitted IT problems and generate a structured ticket.
 
-Analyze the user's text description and video recording.
-1.  If you have enough information, diagnose the root cause and provide a full analysis. Your response MUST be a JSON object containing 'title', 'description', 'status', and 'priority'. Include 'resolution' if a clear fix exists.
-2.  If the input is ambiguous or missing key details for a diagnosis, you MUST ask a single, clear, and concise clarifying question to the user. Your response MUST be a JSON object containing ONLY the 'clarifyingQuestion' field.
-3.  Do not ask a question if you can make a reasonable inference. Only ask if the information is critical.
-4.  Your entire response must be ONLY a single, valid JSON object that strictly adheres to the provided schema. Do not add any extra text, explanation, or markdown formatting.`;
+1.  **Analyze the user's text and video.**
+2.  **Full Analysis:** If you have enough information, diagnose the root cause. Your response MUST be a JSON object with 'title', 'description', 'status', and 'priority'. Include 'resolution' if a clear fix exists.
+3.  **Actionable Script:** If the resolution can be performed by a sequence of simple, safe shell commands, include them as an array of strings in the 'suggestedScript' field. Only include commands that are generally safe and non-destructive.
+4.  **Clarifying Question:** If you lack critical information, you MUST ask a single, clear question. Your response MUST be a JSON object containing ONLY the 'clarifyingQuestion' field.
+5.  **Prioritize Analysis:** Do not ask a question if you can make a reasonable inference.
+6.  **Strict JSON Output:** Your entire response must be ONLY a single, valid JSON object that strictly adheres to the provided schema. Do not add any extra text, explanation, or markdown formatting.`;
 
-const initializeChat = () => {
+const initializeChat = (dynamicInstruction: string) => {
     chat = ai.chats.create({
         model: 'gemini-2.5-flash',
         config: {
-            systemInstruction: systemInstruction,
+            systemInstruction: dynamicInstruction,
             responseMimeType: "application/json",
             responseSchema: schema,
         }
@@ -109,6 +116,7 @@ const processResponse = (response: GenerateContentResponse): ConversationResult 
                     status: result.status,
                     priority: result.priority,
                     resolution: result.resolution || null,
+                    suggestedScript: result.suggestedScript || null,
                 }
             };
         }
@@ -140,12 +148,23 @@ const createErrorFallback = (prompt: string): ConversationResult => {
 export const startConversation = async (videoBlob: Blob, userPrompt: string): Promise<ConversationResult> => {
   try {
     console.log("Starting new AI conversation for prompt:", userPrompt);
-    initializeChat(); // Start a new chat for each new issue
+
+    // Find relevant solutions from the knowledge base
+    const foundSolutions = await window.electronAPI.findSolutions(userPrompt);
+    let dynamicInstruction = systemInstruction;
+
+    if (foundSolutions && foundSolutions.length > 0) {
+        const solutionsContext = foundSolutions.map(s =>
+            `Problem: "${s.problemDescription}"\nSolution: "${s.solutionDescription}"`
+        ).join('\n---\n');
+        dynamicInstruction += `\n\nADDITIONAL CONTEXT: Here are some similar problems that were solved in the past. Use this information to inform your diagnosis and suggested fix:\n${solutionsContext}`;
+    }
+
+    initializeChat(dynamicInstruction); // Start a new chat for each new issue
     if (!chat) throw new Error("Chat could not be initialized.");
 
     const base64Video = await blobToBase64(videoBlob);
     
-    // FIX: The 'sendMessage' method expects a 'message' property containing the parts, not a 'parts' property directly.
     const response = await chat.sendMessage({
       message: [
         { text: `User's problem description: "${userPrompt}"` },
