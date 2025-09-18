@@ -3,7 +3,7 @@ import * as path from 'node:path'
 import robot from 'robotjs'
 import { Low } from 'lowdb'
 import { JSONFilePreset } from 'lowdb/node'
-import type { Ticket } from '../types'
+import type { Ticket, Solution } from '../types'
 import { exec } from 'child_process'
 
 // The built directory structure
@@ -27,10 +27,11 @@ const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 // --- Database Setup ---
 type Data = {
   tickets: Ticket[];
+  solutions: Solution[];
 }
 let db: Low<Data>;
 const initDatabase = async () => {
-    const defaultData: Data = { tickets: [] };
+    const defaultData: Data = { tickets: [], solutions: [] };
     const dbPath = path.join(app.getPath('userData'), 'db.json');
     db = await JSONFilePreset<Data>(dbPath, defaultData);
 }
@@ -97,6 +98,22 @@ ipcMain.handle('db-create-ticket', async (event, ticket) => {
 
 ipcMain.handle('db-get-ticket-by-id', (event, ticketId) => {
     return db.data.tickets.find(t => t.id === ticketId);
+});
+
+ipcMain.handle('db-create-solution', async (event, solution) => {
+    const newSolution = { ...solution, id: `SOL-${Math.random().toString(36).substr(2, 9).toUpperCase()}` };
+    db.data.solutions.push(newSolution);
+    await db.write();
+    return newSolution;
+});
+
+ipcMain.handle('db-find-solutions', (event, problemDescription) => {
+    // This is a very simple search. A real implementation would use a more sophisticated search algorithm.
+    const searchTerms = problemDescription.toLowerCase().split(' ');
+    return db.data.solutions.filter(solution => {
+        const solutionTerms = solution.problemDescription.toLowerCase().split(' ');
+        return searchTerms.some(term => solutionTerms.includes(term));
+    });
 });
 // --- End Database Handlers ---
 

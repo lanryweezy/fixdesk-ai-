@@ -84,11 +84,11 @@ const systemInstruction = `You are "FixDesk AI", an intelligent IT support assis
 5.  **Prioritize Analysis:** Do not ask a question if you can make a reasonable inference.
 6.  **Strict JSON Output:** Your entire response must be ONLY a single, valid JSON object that strictly adheres to the provided schema. Do not add any extra text, explanation, or markdown formatting.`;
 
-const initializeChat = () => {
+const initializeChat = (dynamicInstruction: string) => {
     chat = ai.chats.create({
         model: 'gemini-2.5-flash',
         config: {
-            systemInstruction: systemInstruction,
+            systemInstruction: dynamicInstruction,
             responseMimeType: "application/json",
             responseSchema: schema,
         }
@@ -148,7 +148,19 @@ const createErrorFallback = (prompt: string): ConversationResult => {
 export const startConversation = async (videoBlob: Blob, userPrompt: string): Promise<ConversationResult> => {
   try {
     console.log("Starting new AI conversation for prompt:", userPrompt);
-    initializeChat(); // Start a new chat for each new issue
+
+    // Find relevant solutions from the knowledge base
+    const foundSolutions = await window.electronAPI.findSolutions(userPrompt);
+    let dynamicInstruction = systemInstruction;
+
+    if (foundSolutions && foundSolutions.length > 0) {
+        const solutionsContext = foundSolutions.map(s =>
+            `Problem: "${s.problemDescription}"\nSolution: "${s.solutionDescription}"`
+        ).join('\n---\n');
+        dynamicInstruction += `\n\nADDITIONAL CONTEXT: Here are some similar problems that were solved in the past. Use this information to inform your diagnosis and suggested fix:\n${solutionsContext}`;
+    }
+
+    initializeChat(dynamicInstruction); // Start a new chat for each new issue
     if (!chat) throw new Error("Chat could not be initialized.");
 
     const base64Video = await blobToBase64(videoBlob);

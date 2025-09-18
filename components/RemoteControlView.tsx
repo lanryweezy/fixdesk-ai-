@@ -1,10 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Peer from 'simple-peer';
 
+import { RecordedAction, Solution } from '../types';
+import { SaveSolutionModal } from './SaveSolutionModal';
+
 export const RemoteControlView: React.FC = () => {
     const [offer, setOffer] = useState('');
     const [answer, setAnswer] = useState('');
     const [isConnected, setIsConnected] = useState(false);
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordedActions, setRecordedActions] = useState<RecordedAction[]>([]);
+    const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
     const peerRef = useRef<Peer.Instance | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const viewRef = useRef<HTMLDivElement>(null);
@@ -55,6 +61,12 @@ export const RemoteControlView: React.FC = () => {
     const sendCommand = (channel: string, payload: any) => {
         if (peerRef.current && isConnected) {
             peerRef.current.send(JSON.stringify({ channel, payload }));
+            if (isRecording) {
+                const actionType = channel.replace('robot-', '');
+                if (actionType === 'move' || actionType === 'click' || actionType === 'key') {
+                    setRecordedActions(prev => [...prev, { type: actionType, payload }]);
+                }
+            }
         }
     };
 
@@ -89,12 +101,45 @@ export const RemoteControlView: React.FC = () => {
         };
     }, [isConnected]);
 
+    const handleSaveSolution = async (solutionData: Omit<Solution, 'id'>) => {
+        try {
+            await window.electronAPI.createSolution(solutionData);
+            alert('Solution saved successfully!');
+        } catch (error) {
+            alert(`Error saving solution: ${(error as Error).message}`);
+        }
+        setRecordedActions([]);
+    };
+
     if (isConnected) {
         return (
              <div ref={viewRef} tabIndex={0} className="w-full h-full bg-gray-900 text-white flex flex-col items-center justify-center focus:outline-none">
                 <h2 className="text-2xl font-bold mb-4">Remote Control Session Active</h2>
                 <p className="text-sm text-gray-400 mb-2">(Your mouse and keyboard are now controlling the remote machine)</p>
                 <video ref={videoRef} autoPlay className="w-full max-w-5xl aspect-video bg-black cursor-crosshair" />
+                <div className="mt-4">
+                    <button
+                        onClick={() => {
+                            if (isRecording) {
+                                setIsSaveModalOpen(true);
+                                setIsRecording(false); // Stop recording when opening save modal
+                            } else {
+                                setRecordedActions([]); // Clear old actions before starting
+                                setIsRecording(true);
+                            }
+                        }}
+                        className={`px-4 py-2 rounded font-semibold ${isRecording ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
+                    >
+                        {isRecording ? 'Stop Recording Solution' : 'Start Recording Solution'}
+                    </button>
+                </div>
+                {isSaveModalOpen && (
+                    <SaveSolutionModal
+                        actions={recordedActions}
+                        onClose={() => setIsSaveModalOpen(false)}
+                        onSave={handleSaveSolution}
+                    />
+                )}
             </div>
         )
     }
