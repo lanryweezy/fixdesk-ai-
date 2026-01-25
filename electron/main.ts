@@ -5,6 +5,7 @@ import { Low } from 'lowdb'
 import { JSONFilePreset } from 'lowdb/node'
 import type { Ticket, Solution } from '../types'
 import { exec } from 'child_process'
+import { analyzeTicket } from '../services/ai'
 
 // The built directory structure
 //
@@ -91,9 +92,11 @@ ipcMain.handle('db-get-tickets', () => {
 });
 
 ipcMain.handle('db-create-ticket', async (event, ticket) => {
-    db.data.tickets.push(ticket);
+    const { priority, category } = await analyzeTicket(ticket.description);
+    const ticketWithPriority = { ...ticket, priority, category };
+    db.data.tickets.push(ticketWithPriority);
     await db.write();
-    return ticket;
+    return ticketWithPriority;
 });
 
 ipcMain.handle('db-get-ticket-by-id', (event, ticketId) => {

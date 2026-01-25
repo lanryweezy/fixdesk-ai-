@@ -18,7 +18,8 @@ export interface Ticket {
   resolution?: string;
   videoUrl?: string; // a mock url
   logs?: string[];
-  priority: 'Low' | 'Medium' | 'High';
+  priority: 'Low' | 'Medium' | 'High' | 'Urgent';
+  category: 'Hardware' | 'Software' | 'Network' | 'Account' | 'Other';
 }
 
 export interface RecordedAction {

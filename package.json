@@ -6,11 +6,8 @@
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "concurrently \"npm:dev:vite\" \"npm:dev:electron\"",
-    "dev:vite": "vite",
-    "dev:electron": "npx tsc -p tsconfig.electron.json && wait-on tcp:5173 && electron .",
-    "build": "npm run build:vite && npx tsc -p tsconfig.electron.json && electron-builder",
-    "build:vite": "vite build",
+    "dev": "vite",
+    "build": "vite build && electron-builder",
     "preview": "vite preview",
     "postinstall": "electron-builder install-app-deps"
   },
@@ -43,8 +40,10 @@
     "concurrently": "^9.2.1",
     "electron": "^38.1.0",
     "electron-builder": "^26.0.12",
+    "electron-vite": "^4.0.1",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
+    "vite-plugin-electron": "^0.29.0",
     "wait-on": "^8.0.4"
   }
 }
