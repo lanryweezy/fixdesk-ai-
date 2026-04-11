@@ -1,7 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Peer from 'simple-peer';
 
-export const StartRemoteSession: React.FC = () => {
+interface StartRemoteSessionProps {
+    ticketId?: string;
+}
+
+export const StartRemoteSession: React.FC<StartRemoteSessionProps> = ({ ticketId }) => {
     const [offer, setOffer] = useState('');
     const [answer, setAnswer] = useState('');
     const [isConnected, setIsConnected] = useState(false);
@@ -85,6 +89,11 @@ export const StartRemoteSession: React.FC = () => {
     return (
         <div className="p-8 font-sans">
             <h1 className="text-2xl font-bold mb-4">Start Remote Support Session</h1>
+            {ticketId && (
+                <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400 text-blue-700">
+                    <p className="font-semibold">Session for Ticket: {ticketId}</p>
+                </div>
+            )}
 
             {!isConnected ? (
                 <div className="space-y-6">

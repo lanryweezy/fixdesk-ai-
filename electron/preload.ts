@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Database operations
   getTickets: () => ipcRenderer.invoke('db-get-tickets'),
   createTicket: (ticket: any) => ipcRenderer.invoke('db-create-ticket', ticket),
+  updateTicketStatus: (id: string, status: string) => ipcRenderer.invoke('db-update-ticket-status', id, status),
   getTicketById: (id: string) => ipcRenderer.invoke('db-get-ticket-by-id', id),
   executeCommand: (commands: string[]) => ipcRenderer.invoke('execute-command', commands),
   createSolution: (solution: any) => ipcRenderer.invoke('db-create-solution', solution),

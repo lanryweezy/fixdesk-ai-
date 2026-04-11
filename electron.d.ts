@@ -5,6 +5,7 @@ export interface ElectronApi {
     send: (channel: string, data: any) => void;
     getTickets: () => Promise<Ticket[]>;
     createTicket: (ticket: Ticket) => Promise<Ticket>;
+      updateTicketStatus: (id: string, status: TicketStatus) => Promise<Ticket>;
     getTicketById: (id: string) => Promise<Ticket | undefined>;
     executeCommand: (commands: string[]) => Promise<{ stdout: string; stderr: string }>;
     createSolution: (solution: Omit<Solution, 'id'>) => Promise<Solution>;

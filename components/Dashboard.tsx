@@ -35,6 +35,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets }) => {
       { name: 'IT Support Team', value: humanResolvedCount }
   ].filter(item => item.value > 0);
 
+  // Group tickets by title to get common issues dynamically
+  const issueCounts: Record<string, number> = {};
+  tickets.forEach(ticket => {
+    // Basic grouping by title for now, maybe in the future we'd use something else
+    const category = ticket.title.split(':')[0] || 'Uncategorized';
+    issueCounts[category] = (issueCounts[category] || 0) + 1;
+  });
+
+  const dynamicCommonIssues = Object.entries(issueCounts)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5);
+
+  const displayIssues = dynamicCommonIssues.length > 0 ? dynamicCommonIssues : analytics.commonIssues;
 
   return (
     <div className="space-y-8">
@@ -51,7 +65,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets }) => {
         <Card className="lg:col-span-3">
           <h3 className="text-lg font-semibold text-slate-700 mb-4">Most Common Issues</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={analytics.commonIssues} layout="vertical" margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+            <BarChart data={displayIssues} layout="vertical" margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
               <XAxis type="number" stroke="#94a3b8" />
               <YAxis dataKey="name" type="category" width={110} stroke="#94a3b8" />

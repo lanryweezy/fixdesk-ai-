@@ -4,7 +4,11 @@ import Peer from 'simple-peer';
 import { RecordedAction, Solution } from '../types';
 import { SaveSolutionModal } from './SaveSolutionModal';
 
-export const RemoteControlView: React.FC = () => {
+interface RemoteControlViewProps {
+    ticketId?: string;
+}
+
+export const RemoteControlView: React.FC<RemoteControlViewProps> = ({ ticketId }) => {
     const [offer, setOffer] = useState('');
     const [answer, setAnswer] = useState('');
     const [isConnected, setIsConnected] = useState(false);
@@ -103,7 +107,11 @@ export const RemoteControlView: React.FC = () => {
 
     const handleSaveSolution = async (solutionData: Omit<Solution, 'id'>) => {
         try {
-            await window.electronAPI.createSolution(solutionData);
+            const finalSolutionData = {
+                ...solutionData,
+                problemDescription: ticketId ? `[Ticket: ${ticketId}] ${solutionData.problemDescription}` : solutionData.problemDescription
+            };
+            await window.electronAPI.createSolution(finalSolutionData);
             alert('Solution saved successfully!');
         } catch (error) {
             alert(`Error saving solution: ${(error as Error).message}`);
@@ -147,6 +155,11 @@ export const RemoteControlView: React.FC = () => {
     return (
         <div className="p-8 font-sans">
             <h1 className="text-2xl font-bold mb-4">Accept Remote Session</h1>
+            {ticketId && (
+                <div className="mb-6 p-4 bg-purple-50 border-l-4 border-purple-400 text-purple-700">
+                    <p className="font-semibold">Assisting with Ticket: {ticketId}</p>
+                </div>
+            )}
             <div className="space-y-6">
                 <div>
                     <h2 className="text-lg font-semibold">Step 1: Paste User's Offer</h2>

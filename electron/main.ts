@@ -96,6 +96,16 @@ ipcMain.handle('db-create-ticket', async (event, ticket) => {
     return ticket;
 });
 
+ipcMain.handle('db-update-ticket-status', async (event, id, status) => {
+    const ticket = db.data.tickets.find(t => t.id === id);
+    if (ticket) {
+        ticket.status = status;
+        await db.write();
+        return ticket;
+    }
+    throw new Error('Ticket not found');
+});
+
 ipcMain.handle('db-get-ticket-by-id', (event, ticketId) => {
     return db.data.tickets.find(t => t.id === ticketId);
 });

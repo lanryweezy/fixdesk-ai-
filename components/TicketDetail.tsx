@@ -4,8 +4,10 @@ import { Card } from './common/Card';
 import { ArrowUturnLeftIcon, CogIcon, SpinnerIcon } from './icons/Icons';
 
 interface TicketDetailProps {
-  ticketId: string;
+  ticket: Ticket;
   onBack: () => void;
+  onUpdate?: (ticket: Ticket) => void;
+  onRequestRemote?: (ticketId: string) => void;
 }
 
 const StatusBadge: React.FC<{ status: TicketStatus }> = ({ status }) => {
@@ -23,49 +25,30 @@ const StatusBadge: React.FC<{ status: TicketStatus }> = ({ status }) => {
   </span>;
 };
 
-export const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
-  const [ticket, setTicket] = useState<Ticket | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicket, onBack }) => {
+  const [ticket, setTicket] = useState<Ticket>(initialTicket);
   const [isRequesting, setIsRequesting] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  useEffect(() => {
-    const fetchTicket = async () => {
-      setIsLoading(true);
-      const fetchedTicket = await window.electronAPI.getTicketById(ticketId);
-      setTicket(fetchedTicket || null);
-      setIsLoading(false);
-    };
-    fetchTicket();
-  }, [ticketId]);
+  const handleStatusChange = async (newStatus: TicketStatus) => {
+    setIsUpdatingStatus(true);
+    try {
+      const updatedTicket = await window.electronAPI.updateTicketStatus(ticket.id, newStatus);
+      setTicket(updatedTicket);
+      if (onUpdate) onUpdate(updatedTicket);
+    } catch (error) {
+      alert(`Failed to update status: ${(error as Error).message}`);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
 
   const handleRequestAssistance = () => {
     setIsRequesting(true);
-    // In a real application, an API call would be made here.
+    if (onRequestRemote) {
+        onRequestRemote(ticket.id);
+    }
   };
-
-  if (isLoading) {
-    return (
-        <div className="flex justify-center items-center h-64">
-            <SpinnerIcon className="w-8 h-8 text-brand-primary" />
-        </div>
-    );
-  }
-
-  if (!ticket) {
-    return (
-        <div className="text-center">
-            <h2 className="text-2xl font-bold text-red-600">Ticket Not Found</h2>
-            <p className="text-slate-500 mt-2">The ticket with ID {ticketId} could not be found.</p>
-            <button
-                onClick={onBack}
-                className="mt-6 flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-brand-primary transition-colors"
-            >
-                <ArrowUturnLeftIcon className="w-5 h-5" />
-                Back to all tickets
-            </button>
-        </div>
-    );
-  }
 
   const {
     id, title, description, status, reportedBy, assignedTo, createdAt, resolution, logs, videoUrl
@@ -87,7 +70,19 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) 
             <p className="text-sm text-slate-500">{id}</p>
             <h2 className="text-3xl font-bold text-slate-800 mt-1">{title}</h2>
           </div>
-          <StatusBadge status={status} />
+          <div className="flex flex-col items-end gap-2">
+            <StatusBadge status={status} />
+            <select
+                value={status}
+                disabled={isUpdatingStatus}
+                onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-brand-primary focus:ring-brand-primary sm:text-xs py-1"
+            >
+                {Object.values(TicketStatus).map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                ))}
+            </select>
+          </div>
         </div>
 
         <div className="mt-6 grid grid-cols-3 gap-6 border-b border-t border-slate-200 py-4">

@@ -18,6 +18,7 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [remoteTicketId, setRemoteTicketId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -45,13 +46,31 @@ export default function App() {
     setSelectedTicket(ticket);
   }, []);
 
-  const handleBackToList = useCallback(() => {
+  const handleBackToList = useCallback(async () => {
     setSelectedTicket(null);
+    // Refresh tickets when going back to list to ensure we have latest data
+    const storedTickets = await window.electronAPI.getTickets();
+    setTickets(storedTickets);
   }, []);
   
+  const handleTicketUpdate = useCallback((updatedTicket: Ticket) => {
+    setTickets(prev => prev.map(t => t.id === updatedTicket.id ? updatedTicket : t));
+    setSelectedTicket(updatedTicket);
+  }, []);
+
+  const handleRequestRemote = useCallback((ticketId: string) => {
+    setRemoteTicketId(ticketId);
+    setPage('start-remote-session');
+  }, []);
+
   const renderPage = () => {
     if (page === 'tickets' && selectedTicket) {
-      return <TicketDetail ticket={selectedTicket} onBack={handleBackToList} />;
+      return <TicketDetail
+        ticket={selectedTicket}
+        onBack={handleBackToList}
+        onUpdate={handleTicketUpdate}
+        onRequestRemote={handleRequestRemote}
+      />;
     }
     switch (page) {
       case 'dashboard':
@@ -59,9 +78,9 @@ export default function App() {
       case 'tickets':
         return <TicketsList tickets={tickets} onSelectTicket={handleSelectTicket} />;
       case 'remote':
-        return <RemoteControlView />;
+        return <RemoteControlView ticketId={remoteTicketId || undefined} />;
       case 'start-remote-session':
-        return <StartRemoteSession />;
+        return <StartRemoteSession ticketId={remoteTicketId || undefined} />;
       default:
         return <Dashboard tickets={tickets} />;
     }
