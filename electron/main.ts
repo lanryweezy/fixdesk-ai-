@@ -106,8 +106,22 @@ ipcMain.handle('db-update-ticket-status', async (event, id, status) => {
     throw new Error('Ticket not found');
 });
 
+ipcMain.handle('db-update-ticket', async (event, updatedTicket: Ticket) => {
+    const index = db.data.tickets.findIndex(t => t.id === updatedTicket.id);
+    if (index !== -1) {
+        db.data.tickets[index] = updatedTicket;
+        await db.write();
+        return updatedTicket;
+    }
+    throw new Error('Ticket not found');
+});
+
 ipcMain.handle('db-get-ticket-by-id', (event, ticketId) => {
     return db.data.tickets.find(t => t.id === ticketId);
+});
+
+ipcMain.handle('db-get-solutions', () => {
+    return db.data.solutions;
 });
 
 ipcMain.handle('db-create-solution', async (event, solution) => {

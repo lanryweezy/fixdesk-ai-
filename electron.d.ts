@@ -6,8 +6,10 @@ export interface ElectronApi {
     getTickets: () => Promise<Ticket[]>;
     createTicket: (ticket: Ticket) => Promise<Ticket>;
       updateTicketStatus: (id: string, status: TicketStatus) => Promise<Ticket>;
+      updateTicket: (ticket: Ticket) => Promise<Ticket>;
     getTicketById: (id: string) => Promise<Ticket | undefined>;
     executeCommand: (commands: string[]) => Promise<{ stdout: string; stderr: string }>;
+    getSolutions: () => Promise<Solution[]>;
     createSolution: (solution: Omit<Solution, 'id'>) => Promise<Solution>;
     findSolutions: (problemDescription: string) => Promise<Solution[]>;
 }

@@ -5,13 +5,14 @@ import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { TicketsList } from './components/TicketsList';
 import { TicketDetail } from './components/TicketDetail';
+import { KnowledgeBase } from './components/KnowledgeBase';
 import { ReportIssueModal } from './components/ReportIssueModal';
 import { RemoteControlView } from './components/RemoteControlView';
 import { StartRemoteSession } from './components/StartRemoteSession';
 import { Ticket } from './types';
 import { BrainCircuit } from './components/icons/Icons';
 
-export type Page = 'dashboard' | 'tickets' | 'remote' | 'start-remote-session';
+export type Page = 'dashboard' | 'tickets' | 'remote' | 'start-remote-session' | 'knowledge-base';
 
 export default function App() {
   const [page, setPage] = useState<Page>('dashboard');
@@ -77,6 +78,8 @@ export default function App() {
         return <Dashboard tickets={tickets} />;
       case 'tickets':
         return <TicketsList tickets={tickets} onSelectTicket={handleSelectTicket} />;
+      case 'knowledge-base':
+        return <KnowledgeBase />;
       case 'remote':
         return <RemoteControlView ticketId={remoteTicketId || undefined} />;
       case 'start-remote-session':

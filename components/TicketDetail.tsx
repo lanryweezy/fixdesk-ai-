@@ -25,12 +25,18 @@ const StatusBadge: React.FC<{ status: TicketStatus }> = ({ status }) => {
   </span>;
 };
 
-export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicket, onBack }) => {
+export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicket, onBack, onUpdate, onRequestRemote }) => {
   const [ticket, setTicket] = useState<Ticket>(initialTicket);
   const [isRequesting, setIsRequesting] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isResolutionModalOpen, setIsResolutionModalOpen] = useState(false);
+  const [resolutionText, setResolutionText] = useState(ticket.resolution || '');
 
   const handleStatusChange = async (newStatus: TicketStatus) => {
+    if (newStatus === TicketStatus.RESOLVED) {
+        setIsResolutionModalOpen(true);
+        return;
+    }
     setIsUpdatingStatus(true);
     try {
       const updatedTicket = await window.electronAPI.updateTicketStatus(ticket.id, newStatus);
@@ -40,6 +46,25 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
       alert(`Failed to update status: ${(error as Error).message}`);
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleSaveResolution = async () => {
+    setIsUpdatingStatus(true);
+    try {
+        const updatedTicket = {
+            ...ticket,
+            status: TicketStatus.RESOLVED,
+            resolution: resolutionText
+        };
+        const savedTicket = await window.electronAPI.updateTicket(updatedTicket);
+        setTicket(savedTicket);
+        if (onUpdate) onUpdate(savedTicket);
+        setIsResolutionModalOpen(false);
+    } catch (error) {
+        alert(`Failed to save resolution: ${(error as Error).message}`);
+    } finally {
+        setIsUpdatingStatus(false);
     }
   };
 
@@ -155,6 +180,36 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
           )}
         </div>
       </Card>
+
+      {isResolutionModalOpen && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full">
+            <h3 className="text-lg font-bold text-slate-800 mb-4">Resolve Ticket</h3>
+            <p className="text-sm text-slate-500 mb-4">Please describe how this issue was resolved.</p>
+            <textarea
+              value={resolutionText}
+              onChange={(e) => setResolutionText(e.target.value)}
+              className="w-full h-32 p-2 border border-slate-300 rounded-md focus:ring-brand-primary focus:border-brand-primary mb-6"
+              placeholder="Resolution details..."
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setIsResolutionModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveResolution}
+                disabled={!resolutionText.trim() || isUpdatingStatus}
+                className="px-4 py-2 text-sm font-bold text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors disabled:bg-slate-300"
+              >
+                {isUpdatingStatus ? 'Saving...' : 'Mark as Resolved'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

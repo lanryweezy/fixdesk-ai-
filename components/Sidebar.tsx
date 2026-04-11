@@ -11,6 +11,7 @@ interface SidebarProps {
 const navItems = [
   { name: 'Dashboard', icon: ChartBarIcon, page: 'dashboard' },
   { name: 'My Tickets', icon: TicketIcon, page: 'tickets' },
+  { name: 'Knowledge Base', icon: BrainCircuit, page: 'knowledge-base' },
   { name: 'Start Remote Session', icon: UserGroupIcon, page: 'start-remote-session' },
 ];
 

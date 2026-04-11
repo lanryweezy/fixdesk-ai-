@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Ticket, TicketStatus } from '../types';
 import { Card } from './common/Card';
 import { CogIcon } from './icons/Icons';
@@ -68,17 +68,63 @@ interface TicketsListProps {
 }
 
 export const TicketsList: React.FC<TicketsListProps> = ({ tickets, onSelectTicket }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<TicketStatus | 'All'>('All');
+  const [priorityFilter, setPriorityFilter] = useState<'Low' | 'Medium' | 'High' | 'All'>('All');
+
+  const filteredTickets = tickets.filter(ticket => {
+    const matchesSearch = ticket.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          ticket.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          ticket.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'All' || ticket.status === statusFilter;
+    const matchesPriority = priorityFilter === 'All' || ticket.priority === priorityFilter;
+    return matchesSearch && matchesStatus && matchesPriority;
+  });
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 className="text-3xl font-bold text-slate-800">My Tickets</h2>
-        {/* Future filter buttons can go here */}
+        <div className="flex flex-wrap gap-3 w-full md:w-auto">
+            <input
+                type="text"
+                placeholder="Search tickets..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary min-w-[200px] flex-1 md:flex-none"
+            />
+            <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className="px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            >
+                <option value="All">All Statuses</option>
+                {Object.values(TicketStatus).map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+             <select
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value as any)}
+                className="px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            >
+                <option value="All">All Priorities</option>
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+            </select>
+        </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-        {tickets.map((ticket) => (
-          <TicketItem key={ticket.id} ticket={ticket} onSelect={onSelectTicket} />
-        ))}
-      </div>
+
+      {filteredTickets.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {filteredTickets.map((ticket) => (
+            <TicketItem key={ticket.id} ticket={ticket} onSelect={onSelectTicket} />
+            ))}
+        </div>
+      ) : (
+        <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
+            <p className="text-slate-500">No tickets found matching your criteria.</p>
+        </div>
+      )}
     </div>
   );
 };
