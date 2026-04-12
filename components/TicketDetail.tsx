@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Ticket, TicketStatus } from '../types';
+import { Ticket, TicketStatus, Solution } from '../types';
 import { Card } from './common/Card';
-import { ArrowUturnLeftIcon, CogIcon, SpinnerIcon } from './icons/Icons';
+import { ArrowUturnLeftIcon, CogIcon, SpinnerIcon, BrainCircuit, PaperAirplaneIcon } from './icons/Icons';
+import { askAboutTicket } from '../services/geminiService';
 
 interface TicketDetailProps {
   ticket: Ticket;
@@ -31,6 +32,28 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isResolutionModalOpen, setIsResolutionModalOpen] = useState(false);
   const [resolutionText, setResolutionText] = useState(ticket.resolution || '');
+  const [recommendedSolutions, setRecommendedSolutions] = useState<Solution[]>([]);
+  const [isLoadingSolutions, setIsLoadingSolutions] = useState(false);
+  const [chatMessage, setChatMessage] = useState('');
+  const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'ai', content: string }[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
+
+  useEffect(() => {
+    const fetchRecommendedSolutions = async () => {
+        setIsLoadingSolutions(true);
+        try {
+            const solutions = await window.electronAPI.findSolutions(ticket.title + ' ' + ticket.description);
+            setRecommendedSolutions(solutions);
+        } catch (error) {
+            console.error('Error finding solutions:', error);
+        } finally {
+            setIsLoadingSolutions(false);
+        }
+    };
+    if (ticket.status !== TicketStatus.RESOLVED && ticket.status !== TicketStatus.AI_RESOLVED) {
+        fetchRecommendedSolutions();
+    }
+  }, [ticket.id]);
 
   const handleStatusChange = async (newStatus: TicketStatus) => {
     if (newStatus === TicketStatus.RESOLVED) {
@@ -72,6 +95,25 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
     setIsRequesting(true);
     if (onRequestRemote) {
         onRequestRemote(ticket.id);
+    }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatMessage.trim()) return;
+
+    const userMsg = chatMessage;
+    setChatHistory(prev => [...prev, { role: 'user', content: userMsg }]);
+    setChatMessage('');
+    setIsTyping(true);
+
+    try {
+        const aiResponse = await askAboutTicket(ticket, userMsg);
+        setChatHistory(prev => [...prev, { role: 'ai', content: aiResponse }]);
+    } catch (error) {
+        setChatHistory(prev => [...prev, { role: 'ai', content: "I'm sorry, I encountered an error. Please try again." }]);
+    } finally {
+        setIsTyping(false);
     }
   };
 
@@ -157,9 +199,83 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
               </div>
             </div>
           )}
+
+          {status !== TicketStatus.RESOLVED && status !== TicketStatus.AI_RESOLVED && (
+            <div className="pt-6 border-t border-slate-200">
+                <div className="flex items-center gap-2 mb-4">
+                    <BrainCircuit className="w-5 h-5 text-brand-primary" />
+                    <h3 className="text-lg font-semibold text-slate-700">AI Recommended Solutions</h3>
+                </div>
+                {isLoadingSolutions ? (
+                    <div className="flex justify-center py-4">
+                        <SpinnerIcon className="w-6 h-6 text-brand-primary" />
+                    </div>
+                ) : recommendedSolutions.length > 0 ? (
+                    <div className="space-y-4">
+                        {recommendedSolutions.map((solution) => (
+                            <div key={solution.id} className="p-4 bg-brand-primary/5 border border-brand-primary/10 rounded-lg">
+                                <h4 className="font-bold text-slate-800 text-sm mb-1">{solution.problemDescription}</h4>
+                                <p className="text-slate-600 text-sm">{solution.solutionDescription}</p>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-sm text-slate-500 italic">No similar solutions found in knowledge base yet.</p>
+                )}
+            </div>
+          )}
+
+          <div className="pt-8 border-t border-slate-200">
+            <div className="flex items-center gap-2 mb-4">
+                <BrainCircuit className="w-6 h-6 text-brand-primary" />
+                <h3 className="text-xl font-bold text-slate-800">Ask FixDesk AI About This Ticket</h3>
+            </div>
+
+            <div className="bg-slate-50 rounded-xl p-4 min-h-[100px] max-h-[300px] overflow-y-auto mb-4 border border-slate-200 space-y-3">
+                {chatHistory.length === 0 ? (
+                    <p className="text-slate-400 text-sm italic text-center py-8">No messages yet. Ask me anything about this ticket's status, logs, or potential fixes.</p>
+                ) : (
+                    chatHistory.map((msg, i) => (
+                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm ${
+                                msg.role === 'user'
+                                ? 'bg-brand-primary text-white rounded-br-none'
+                                : 'bg-white text-slate-700 border border-slate-200 rounded-bl-none shadow-sm'
+                            }`}>
+                                {msg.content}
+                            </div>
+                        </div>
+                    ))
+                )}
+                {isTyping && (
+                    <div className="flex justify-start">
+                        <div className="bg-white px-4 py-2 rounded-2xl rounded-bl-none border border-slate-200 shadow-sm">
+                            <SpinnerIcon className="w-4 h-4 text-brand-primary animate-spin" />
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <form onSubmit={handleSendMessage} className="relative">
+                <input
+                    type="text"
+                    value={chatMessage}
+                    onChange={(e) => setChatMessage(e.target.value)}
+                    placeholder="Ask a question..."
+                    className="w-full pl-4 pr-12 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent transition-all shadow-sm"
+                />
+                <button
+                    type="submit"
+                    disabled={!chatMessage.trim() || isTyping}
+                    className="absolute right-2 top-2 p-1.5 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 transition-colors disabled:bg-slate-300"
+                >
+                    <PaperAirplaneIcon className="w-5 h-5" />
+                </button>
+            </form>
+          </div>
           
           {status !== TicketStatus.RESOLVED && status !== TicketStatus.AI_RESOLVED && (
-            <div className="text-center pt-6 border-t border-slate-200">
+            <div className="text-center pt-8 border-t border-slate-200">
               <h3 className="text-lg font-semibold text-slate-700">Still need help?</h3>
               <p className="text-slate-500 mt-1 mb-4">An IT agent can start a remote session to fix this directly.</p>
               <button

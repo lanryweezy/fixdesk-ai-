@@ -193,3 +193,35 @@ export const continueConversation = async (userResponse: string): Promise<Conver
         return createErrorFallback(userResponse);
     }
 };
+
+export const askAboutTicket = async (ticket: any, question: string): Promise<string> => {
+  try {
+    const genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const prompt = `
+      You are an IT support assistant for "FixDesk AI".
+      A user is asking a question about a specific support ticket.
+
+      TICKET DETAILS:
+      Title: ${ticket.title}
+      Description: ${ticket.description}
+      Status: ${ticket.status}
+      Reported By: ${ticket.reportedBy}
+      Created At: ${ticket.createdAt}
+      Resolution: ${ticket.resolution || 'N/A'}
+
+      USER QUESTION:
+      ${question}
+
+      Please provide a helpful and concise answer based on the ticket details.
+    `;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
+  } catch (error) {
+    console.error("Error in askAboutTicket:", error);
+    return "I'm sorry, I'm having trouble processing your request right now. Please try again later.";
+  }
+};

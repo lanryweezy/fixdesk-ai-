@@ -20,6 +20,7 @@ export default function App() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [remoteTicketId, setRemoteTicketId] = useState<string | null>(null);
+  const [role, setRole] = useState<'staff' | 'admin'>('admin');
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -91,9 +92,15 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-slate-100 font-sans">
-      <Sidebar currentPage={page} setPage={setPage} onReportIssue={() => setIsModalOpen(true)} />
+      <Sidebar
+        currentPage={page}
+        setPage={setPage}
+        onReportIssue={() => setIsModalOpen(true)}
+        role={role}
+        onRoleToggle={() => setRole(role === 'admin' ? 'staff' : 'admin')}
+      />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
+        <Header role={role} />
         <main className="flex-1 overflow-y-auto p-8">
           {renderPage()}
         </main>

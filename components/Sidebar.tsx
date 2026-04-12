@@ -6,20 +6,22 @@ interface SidebarProps {
   currentPage: string;
   setPage: (page: Page) => void;
   onReportIssue: () => void;
+  role: 'staff' | 'admin';
+  onRoleToggle: () => void;
 }
 
 const navItems = [
-  { name: 'Dashboard', icon: ChartBarIcon, page: 'dashboard' },
-  { name: 'My Tickets', icon: TicketIcon, page: 'tickets' },
-  { name: 'Knowledge Base', icon: BrainCircuit, page: 'knowledge-base' },
-  { name: 'Start Remote Session', icon: UserGroupIcon, page: 'start-remote-session' },
+  { name: 'Dashboard', icon: ChartBarIcon, page: 'dashboard', roles: ['admin'] },
+  { name: 'My Tickets', icon: TicketIcon, page: 'tickets', roles: ['staff', 'admin'] },
+  { name: 'Knowledge Base', icon: BrainCircuit, page: 'knowledge-base', roles: ['staff', 'admin'] },
+  { name: 'Start Remote Session', icon: UserGroupIcon, page: 'start-remote-session', roles: ['staff'] },
 ];
 
 const adminNavItems = [
-    { name: 'Remote Control', icon: ShieldCheckIcon, page: 'remote' },
+    { name: 'Remote Control', icon: ShieldCheckIcon, page: 'remote', roles: ['admin'] },
 ]
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReportIssue }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReportIssue, role, onRoleToggle }) => {
   return (
     <div className="w-64 bg-white border-r border-slate-200 flex flex-col p-4">
       <div className="flex items-center gap-2 px-2 mb-8">
@@ -38,7 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
           </button>
           
           <ul className="mt-8 space-y-2">
-            {navItems.map((item) => (
+            {navItems.filter(item => item.roles.includes(role)).map((item) => (
               <li key={item.name}>
                 <a
                   href="#"
@@ -59,11 +61,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
             ))}
           </ul>
 
-          <div className="mt-8">
-            <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Admin Tools</p>
-            <ul className="mt-2 space-y-2">
-                {adminNavItems.map((item) => (
-                    <li key={item.name}>
+          {role === 'admin' && (
+            <div className="mt-8">
+                <p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Admin Tools</p>
+                <ul className="mt-2 space-y-2">
+                    {adminNavItems.map((item) => (
+                        <li key={item.name}>
                         <a
                         href="#"
                         onClick={(e) => {
@@ -80,12 +83,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
                         {item.name}
                         </a>
                     </li>
-                ))}
-            </ul>
-          </div>
+                    ))}
+                </ul>
+            </div>
+          )}
         </div>
 
-        <div className="p-4 bg-slate-100 rounded-lg text-center">
+        <div className="space-y-4">
+            <button
+                onClick={onRoleToggle}
+                className="w-full flex items-center justify-between px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors group"
+            >
+                <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${role === 'admin' ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                    <span className="text-sm font-medium text-slate-700 capitalize">{role} Mode</span>
+                </div>
+                <span className="text-xs text-slate-400 group-hover:text-brand-primary">Switch</span>
+            </button>
+
+            <div className="p-4 bg-slate-100 rounded-lg text-center">
             <p className="text-sm text-slate-600">
                 Having trouble? Our AI is here to help you get back on track, fast.
             </p>
