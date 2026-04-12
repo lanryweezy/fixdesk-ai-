@@ -22,6 +22,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSolutions: () => ipcRenderer.invoke('db-get-solutions'),
   createSolution: (solution: any) => ipcRenderer.invoke('db-create-solution', solution),
   findSolutions: (problemDescription: string) => ipcRenderer.invoke('db-find-solutions', problemDescription),
+  upsertRemoteSession: (session: any) => ipcRenderer.invoke('db-upsert-remote-session', session),
+  getRemoteSession: (ticketId: string) => ipcRenderer.invoke('db-get-remote-session', ticketId),
+  deleteRemoteSession: (ticketId: string) => ipcRenderer.invoke('db-delete-remote-session', ticketId),
 
   // Remote control actions (send for one-way communication)
   send: (channel: string, data: any) => {

@@ -28,10 +28,11 @@ const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 type Data = {
   tickets: Ticket[];
   solutions: Solution[];
+  remoteSessions: RemoteSession[];
 }
 let db: Low<Data>;
 const initDatabase = async () => {
-    const defaultData: Data = { tickets: [], solutions: [] };
+    const defaultData: Data = { tickets: [], solutions: [], remoteSessions: [] };
     const dbPath = path.join(app.getPath('userData'), 'db.json');
     db = await JSONFilePreset<Data>(dbPath, defaultData);
 }
@@ -138,6 +139,26 @@ ipcMain.handle('db-find-solutions', (event, problemDescription) => {
         const solutionTerms = solution.problemDescription.toLowerCase().split(' ');
         return searchTerms.some(term => solutionTerms.includes(term));
     });
+});
+
+ipcMain.handle('db-upsert-remote-session', async (event, session: RemoteSession) => {
+    const index = db.data.remoteSessions.findIndex(s => s.ticketId === session.ticketId);
+    if (index !== -1) {
+        db.data.remoteSessions[index] = { ...db.data.remoteSessions[index], ...session, updatedAt: new Date().toISOString() };
+    } else {
+        db.data.remoteSessions.push({ ...session, updatedAt: new Date().toISOString() });
+    }
+    await db.write();
+    return session;
+});
+
+ipcMain.handle('db-get-remote-session', (event, ticketId) => {
+    return db.data.remoteSessions.find(s => s.ticketId === ticketId);
+});
+
+ipcMain.handle('db-delete-remote-session', async (event, ticketId) => {
+    db.data.remoteSessions = db.data.remoteSessions.filter(s => s.ticketId !== ticketId);
+    await db.write();
 });
 // --- End Database Handlers ---
 

@@ -1,15 +1,30 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Peer from 'simple-peer';
+import { useToast } from '../services/ToastContext';
 
 interface StartRemoteSessionProps {
     ticketId?: string;
 }
 
 export const StartRemoteSession: React.FC<StartRemoteSessionProps> = ({ ticketId }) => {
+    const { addToast } = useToast();
     const [offer, setOffer] = useState('');
     const [answer, setAnswer] = useState('');
     const [isConnected, setIsConnected] = useState(false);
     const peerRef = useRef<Peer.Instance | null>(null);
+
+    useEffect(() => {
+        if (ticketId && offer && !isConnected) {
+            const interval = setInterval(async () => {
+                const session = await window.electronAPI.getRemoteSession(ticketId);
+                if (session?.answer && session.answer !== answer) {
+                    setAnswer(session.answer);
+                    handleConnect(session.answer);
+                }
+            }, 3000);
+            return () => clearInterval(interval);
+        }
+    }, [ticketId, offer, isConnected, answer]);
 
     const handleGenerateOffer = async () => {
         try {
@@ -40,8 +55,13 @@ export const StartRemoteSession: React.FC<StartRemoteSessionProps> = ({ ticketId
                 stream: stream,
             });
 
-            peer.on('signal', (data) => {
-                setOffer(JSON.stringify(data));
+            peer.on('signal', async (data) => {
+                const offerStr = JSON.stringify(data);
+                setOffer(offerStr);
+                if (ticketId) {
+                    await window.electronAPI.upsertRemoteSession({ ticketId, offer: offerStr, updatedAt: new Date().toISOString() });
+                    addToast('Offer published to IT support', 'success');
+                }
             });
 
             peer.on('connect', () => {
@@ -60,8 +80,7 @@ export const StartRemoteSession: React.FC<StartRemoteSessionProps> = ({ ticketId
 
             peer.on('error', (err) => {
                 console.error('Peer connection error:', err);
-                // TODO: Replace with a more robust notification system
-                alert('Connection error: ' + err.message);
+                addToast('Connection error: ' + err.message, 'error');
                 setIsConnected(false);
             });
 
@@ -69,18 +88,17 @@ export const StartRemoteSession: React.FC<StartRemoteSessionProps> = ({ ticketId
 
         } catch (error) {
             console.error("Error generating offer:", error);
-            // TODO: Replace with a more robust notification system
-            alert("Could not start remote session: " + (error as Error).message);
+            addToast("Could not start remote session: " + (error as Error).message, 'error');
         }
     };
 
-    const handleConnect = () => {
-        if (peerRef.current && answer) {
+    const handleConnect = (answerStr?: string) => {
+        const finalAnswer = answerStr || answer;
+        if (peerRef.current && finalAnswer) {
             try {
-                peerRef.current.signal(JSON.parse(answer));
+                peerRef.current.signal(JSON.parse(finalAnswer));
             } catch (error) {
-                // TODO: Replace with a more robust notification system
-                alert("Invalid answer format. Please ensure you've copied it correctly.");
+                addToast("Invalid answer format. Please ensure you've copied it correctly.", 'error');
                 console.error("Error signaling answer:", error);
             }
         }
@@ -106,7 +124,7 @@ export const StartRemoteSession: React.FC<StartRemoteSessionProps> = ({ ticketId
                         >
                             Start Sharing & Generate Offer
                         </button>
-                        {offer && (
+                        {offer && !ticketId && (
                             <div className="mt-4">
                                 <p className="text-sm text-gray-600">Copy this offer and send it to your IT admin:</p>
                                 <textarea
@@ -117,9 +135,18 @@ export const StartRemoteSession: React.FC<StartRemoteSessionProps> = ({ ticketId
                                 />
                             </div>
                         )}
+                        {offer && ticketId && (
+                            <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <p className="text-sm text-yellow-700">The offer has been automatically shared with IT support. Please wait for an admin to connect.</p>
+                                <div className="mt-2 flex items-center gap-2">
+                                    <SpinnerIcon className="w-4 h-4 animate-spin text-yellow-600" />
+                                    <span className="text-xs font-medium text-yellow-600">Waiting for connection...</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
-                    {offer && (
+                    {offer && !ticketId && (
                          <div>
                             <h2 className="text-lg font-semibold">Step 2: Paste Admin's Answer</h2>
                              <textarea

@@ -3,14 +3,33 @@ import Peer from 'simple-peer';
 
 import { RecordedAction, Solution } from '../types';
 import { SaveSolutionModal } from './SaveSolutionModal';
+import { useToast } from '../services/ToastContext';
 
 interface RemoteControlViewProps {
     ticketId?: string;
 }
 
 export const RemoteControlView: React.FC<RemoteControlViewProps> = ({ ticketId }) => {
+    const { addToast } = useToast();
     const [offer, setOffer] = useState('');
     const [answer, setAnswer] = useState('');
+    const [isPolling, setIsPolling] = useState(false);
+
+    useEffect(() => {
+        if (ticketId && !isConnected && !offer) {
+            setIsPolling(true);
+            const interval = setInterval(async () => {
+                const session = await window.electronAPI.getRemoteSession(ticketId);
+                if (session?.offer) {
+                    setOffer(session.offer);
+                    addToast('Received remote session offer', 'success');
+                    clearInterval(interval);
+                    setIsPolling(false);
+                }
+            }, 3000);
+            return () => clearInterval(interval);
+        }
+    }, [ticketId, isConnected, offer]);
     const [isConnected, setIsConnected] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [recordedActions, setRecordedActions] = useState<RecordedAction[]>([]);
@@ -26,8 +45,13 @@ export const RemoteControlView: React.FC<RemoteControlViewProps> = ({ ticketId }
                 trickle: false,
             });
 
-            peer.on('signal', (data) => {
-                setAnswer(JSON.stringify(data));
+            peer.on('signal', async (data) => {
+                const answerStr = JSON.stringify(data);
+                setAnswer(answerStr);
+                if (ticketId) {
+                    await window.electronAPI.upsertRemoteSession({ ticketId, answer: answerStr, updatedAt: new Date().toISOString() });
+                    addToast('Answer sent to user', 'success');
+                }
             });
 
             peer.on('stream', (stream) => {
@@ -47,8 +71,7 @@ export const RemoteControlView: React.FC<RemoteControlViewProps> = ({ ticketId }
 
             peer.on('error', (err) => {
                 console.error('Peer connection error:', err);
-                // TODO: Replace with a more robust notification system
-                alert('Connection error: ' + err.message);
+                addToast('Connection error: ' + err.message, 'error');
                 setIsConnected(false);
             });
 
@@ -56,8 +79,7 @@ export const RemoteControlView: React.FC<RemoteControlViewProps> = ({ ticketId }
             peerRef.current = peer;
 
         } catch (error) {
-            // TODO: Replace with a more robust notification system
-            alert("Invalid offer format. Please ensure you've copied it correctly.");
+            addToast("Invalid offer format. Please ensure you've copied it correctly.", 'error');
             console.error("Error accepting offer:", error);
         }
     };
@@ -112,9 +134,9 @@ export const RemoteControlView: React.FC<RemoteControlViewProps> = ({ ticketId }
                 problemDescription: ticketId ? `[Ticket: ${ticketId}] ${solutionData.problemDescription}` : solutionData.problemDescription
             };
             await window.electronAPI.createSolution(finalSolutionData);
-            alert('Solution saved successfully!');
+            addToast('Solution saved successfully!', 'success');
         } catch (error) {
-            alert(`Error saving solution: ${(error as Error).message}`);
+            addToast(`Error saving solution: ${(error as Error).message}`, 'error');
         }
         setRecordedActions([]);
     };
@@ -160,25 +182,43 @@ export const RemoteControlView: React.FC<RemoteControlViewProps> = ({ ticketId }
                     <p className="font-semibold">Assisting with Ticket: {ticketId}</p>
                 </div>
             )}
-            <div className="space-y-6">
-                <div>
-                    <h2 className="text-lg font-semibold">Step 1: Paste User's Offer</h2>
-                    <textarea
-                        value={offer}
-                        onChange={(e) => setOffer(e.target.value)}
-                        className="w-full h-32 p-2 mt-1 border rounded"
-                        placeholder="Paste the offer from the user here..."
-                    />
-                    <button
-                        onClick={handleAcceptOffer}
-                        disabled={!offer || !!answer}
-                        className="mt-2 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400"
-                    >
-                        Accept & Generate Answer
-                    </button>
+            {isPolling && (
+                <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">
+                    <SpinnerIcon className="w-5 h-5 animate-spin text-yellow-600" />
+                    <p className="text-sm text-yellow-700 font-medium">Waiting for user to start sharing their screen...</p>
                 </div>
+            )}
+            <div className="space-y-6">
+                {!ticketId && (
+                    <div>
+                        <h2 className="text-lg font-semibold">Step 1: Paste User's Offer</h2>
+                        <textarea
+                            value={offer}
+                            onChange={(e) => setOffer(e.target.value)}
+                            className="w-full h-32 p-2 mt-1 border rounded"
+                            placeholder="Paste the offer from the user here..."
+                        />
+                        <button
+                            onClick={handleAcceptOffer}
+                            disabled={!offer || !!answer}
+                            className="mt-2 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400"
+                        >
+                            Accept & Generate Answer
+                        </button>
+                    </div>
+                )}
+                {ticketId && offer && !isConnected && !answer && (
+                    <div>
+                         <button
+                            onClick={handleAcceptOffer}
+                            className="bg-brand-primary hover:bg-brand-primary/90 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all"
+                        >
+                            Connect to User's Screen
+                        </button>
+                    </div>
+                )}
 
-                {answer && (
+                {answer && !ticketId && (
                     <div>
                         <h2 className="text-lg font-semibold">Step 2: Send Answer to User</h2>
                         <p className="text-sm text-gray-600">Copy this answer and send it back to the user:</p>

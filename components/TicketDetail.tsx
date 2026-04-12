@@ -3,12 +3,14 @@ import { Ticket, TicketStatus, Solution } from '../types';
 import { Card } from './common/Card';
 import { ArrowUturnLeftIcon, CogIcon, SpinnerIcon, BrainCircuit, PaperAirplaneIcon } from './icons/Icons';
 import { askAboutTicket } from '../services/geminiService';
+import { useToast } from '../services/ToastContext';
 
 interface TicketDetailProps {
   ticket: Ticket;
   onBack: () => void;
   onUpdate?: (ticket: Ticket) => void;
   onRequestRemote?: (ticketId: string) => void;
+  role?: 'staff' | 'admin';
 }
 
 const StatusBadge: React.FC<{ status: TicketStatus }> = ({ status }) => {
@@ -26,7 +28,8 @@ const StatusBadge: React.FC<{ status: TicketStatus }> = ({ status }) => {
   </span>;
 };
 
-export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicket, onBack, onUpdate, onRequestRemote }) => {
+export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicket, onBack, onUpdate, onRequestRemote, role = 'admin' }) => {
+  const { addToast } = useToast();
   const [ticket, setTicket] = useState<Ticket>(initialTicket);
   const [isRequesting, setIsRequesting] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
@@ -65,8 +68,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
       const updatedTicket = await window.electronAPI.updateTicketStatus(ticket.id, newStatus);
       setTicket(updatedTicket);
       if (onUpdate) onUpdate(updatedTicket);
+      addToast(`Status updated to ${newStatus}`, 'success');
     } catch (error) {
-      alert(`Failed to update status: ${(error as Error).message}`);
+      addToast(`Failed to update status: ${(error as Error).message}`, 'error');
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -84,8 +88,27 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
         setTicket(savedTicket);
         if (onUpdate) onUpdate(savedTicket);
         setIsResolutionModalOpen(false);
+        addToast('Ticket marked as resolved', 'success');
     } catch (error) {
-        alert(`Failed to save resolution: ${(error as Error).message}`);
+        addToast(`Failed to save resolution: ${(error as Error).message}`, 'error');
+    } finally {
+        setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleAssignToMe = async () => {
+    setIsUpdatingStatus(true);
+    try {
+        const updatedTicket = {
+            ...ticket,
+            assignedTo: 'Alex Smith' // Mocked user
+        };
+        const savedTicket = await window.electronAPI.updateTicket(updatedTicket);
+        setTicket(savedTicket);
+        if (onUpdate) onUpdate(savedTicket);
+        addToast('Ticket assigned to you', 'success');
+    } catch (error) {
+        addToast(`Failed to assign ticket: ${(error as Error).message}`, 'error');
     } finally {
         setIsUpdatingStatus(false);
     }
@@ -139,16 +162,18 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
           </div>
           <div className="flex flex-col items-end gap-2">
             <StatusBadge status={status} />
-            <select
-                value={status}
-                disabled={isUpdatingStatus}
-                onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-brand-primary focus:ring-brand-primary sm:text-xs py-1"
-            >
-                {Object.values(TicketStatus).map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                ))}
-            </select>
+            {role === 'admin' && (
+                <select
+                    value={status}
+                    disabled={isUpdatingStatus}
+                    onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-brand-primary focus:ring-brand-primary sm:text-xs py-1"
+                >
+                    {Object.values(TicketStatus).map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                    ))}
+                </select>
+            )}
           </div>
         </div>
 
@@ -159,7 +184,18 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
           </div>
           <div>
             <h4 className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Assigned To</h4>
-            <p className="text-slate-700 font-medium">{assignedTo || 'Unassigned'}</p>
+            <div className="flex items-center gap-2">
+                <p className="text-slate-700 font-medium">{assignedTo || 'Unassigned'}</p>
+                {role === 'admin' && !assignedTo && (
+                    <button
+                        onClick={handleAssignToMe}
+                        disabled={isUpdatingStatus}
+                        className="text-[10px] font-bold text-brand-primary hover:underline uppercase"
+                    >
+                        Assign to me
+                    </button>
+                )}
+            </div>
           </div>
           <div>
             <h4 className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Date Created</h4>

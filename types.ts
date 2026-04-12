@@ -41,3 +41,10 @@ export interface AnalyticsData {
   commonIssues: { name: string; value: number }[];
   resolutionBy: { name: string; value: number }[];
 }
+
+export interface RemoteSession {
+  ticketId: string;
+  offer?: string;
+  answer?: string;
+  updatedAt: string;
+}

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { startConversation, continueConversation, AnalysisResult, ConversationResult } from '../services/geminiService';
 import { Ticket, TicketStatus } from '../types';
 import { ComputerDesktopIcon, BrainCircuit, CheckCircleIcon, XCircleIcon } from './icons/Icons';
+import { useToast } from '../services/ToastContext';
 
 
 type ModalStep = 'initial' | 'recording' | 'processing' | 'result' | 'clarification';
@@ -12,6 +13,7 @@ interface ReportIssueModalProps {
 }
 
 export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onTicketCreated }) => {
+  const { addToast } = useToast();
   const [step, setStep] = useState<ModalStep>('initial');
   const [prompt, setPrompt] = useState('');
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -19,6 +21,7 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
   const [clarificationQuestion, setClarificationQuestion] = useState('');
   const [userAnswer, setUserAnswer] = useState('');
   const [isExecutingCommand, setIsExecutingCommand] = useState(false);
+  const [executionLogs, setExecutionLogs] = useState<{ type: 'stdout' | 'stderr', content: string }[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
@@ -98,7 +101,7 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
 
         if (videoBlob.size === 0) {
             console.warn("Recording was empty.");
-            alert("Recording failed or was too short. Please try again.");
+            addToast("Recording failed or was too short. Please try again.", 'error');
             setStep('initial');
             return;
         }
@@ -111,7 +114,7 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
     } catch (err) {
       console.error("Error starting screen recording.", err);
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
-      alert(`Could not start screen recording: ${errorMessage}`);
+      addToast(`Could not start screen recording: ${errorMessage}`, 'error');
       setStep('initial');
     }
   }, [prompt, handleStopButtonClick]);
@@ -158,16 +161,20 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
     if (!analysisResult?.suggestedScript) return;
 
     setIsExecutingCommand(true);
+    setExecutionLogs([]);
     try {
         const { stdout, stderr } = await window.electronAPI.executeCommand(analysisResult.suggestedScript);
+        if (stdout) setExecutionLogs(prev => [...prev, { type: 'stdout', content: stdout }]);
+        if (stderr) setExecutionLogs(prev => [...prev, { type: 'stderr', content: stderr }]);
+
         if (stderr) {
-            alert(`Script failed:\n${stderr}`);
+            addToast(`Script encountered an error`, 'error');
         } else {
-            alert(`Command executed successfully:\n${stdout}`);
-            // Optionally, you could re-run analysis or mark as resolved here
+            addToast(`Command executed successfully`, 'success');
         }
     } catch (error) {
-        alert(`An error occurred while executing the command: ${(error as Error).message}`);
+        setExecutionLogs(prev => [...prev, { type: 'stderr', content: (error as Error).message }]);
+        addToast(`An error occurred while executing the command`, 'error');
     } finally {
         setIsExecutingCommand(false);
     }
@@ -302,8 +309,23 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
                         disabled={isExecutingCommand}
                         className="mt-3 w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm transition-all disabled:bg-gray-400"
                     >
-                        {isExecutingCommand ? 'Executing Script...' : 'Attempt Automated Fix'}
+                        {isExecutingCommand ? (
+                            <>
+                                <SpinnerIcon className="w-4 h-4 animate-spin" />
+                                Executing Script...
+                            </>
+                        ) : 'Attempt Automated Fix'}
                     </button>
+                </div>
+            )}
+
+            {executionLogs.length > 0 && (
+                <div className="mt-4 p-3 bg-slate-900 rounded-lg font-mono text-[10px] leading-tight max-h-[150px] overflow-y-auto">
+                    {executionLogs.map((log, i) => (
+                        <div key={i} className={log.type === 'stderr' ? 'text-red-400' : 'text-green-400'}>
+                            <span className="opacity-50">[{log.type.toUpperCase()}]</span> {log.content}
+                        </div>
+                    ))}
                 </div>
             )}
             <div className="mt-6 flex flex-col sm:flex-row-reverse gap-3">

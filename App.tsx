@@ -72,6 +72,7 @@ export default function App() {
         onBack={handleBackToList}
         onUpdate={handleTicketUpdate}
         onRequestRemote={handleRequestRemote}
+        role={role}
       />;
     }
     switch (page) {

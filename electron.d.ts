@@ -12,6 +12,9 @@ export interface ElectronApi {
     getSolutions: () => Promise<Solution[]>;
     createSolution: (solution: Omit<Solution, 'id'>) => Promise<Solution>;
     findSolutions: (problemDescription: string) => Promise<Solution[]>;
+    upsertRemoteSession: (session: RemoteSession) => Promise<RemoteSession>;
+    getRemoteSession: (ticketId: string) => Promise<RemoteSession | undefined>;
+    deleteRemoteSession: (ticketId: string) => Promise<void>;
 }
 
 declare global {
