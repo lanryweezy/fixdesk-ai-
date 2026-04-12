@@ -257,3 +257,33 @@ export const categorizeAndPrioritize = async (title: string, description: string
         return { priority: 'Medium', category: 'General' };
     }
 }
+
+export const draftAiResponse = async (ticket: any): Promise<string> => {
+    try {
+        const genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+        const prompt = `
+            You are an IT support assistant for "FixDesk AI".
+            Draft a professional and helpful response to the user who reported this ticket.
+
+            TICKET DETAILS:
+            Title: ${ticket.title}
+            Description: ${ticket.description}
+            Status: ${ticket.status}
+            Activities: ${JSON.stringify(ticket.activities || [])}
+
+            If there is a resolution, include instructions on how to verify it.
+            If it's still being worked on, provide a status update.
+
+            Respond with ONLY the drafted response text.
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        return response.text();
+    } catch (error) {
+        console.error("Error in draftAiResponse:", error);
+        return "I'm sorry, I could not draft a response at this time.";
+    }
+}

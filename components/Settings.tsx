@@ -1,13 +1,15 @@
 import React from 'react';
 import { Card } from './common/Card';
-import { Cog8ToothIcon, ShieldCheckIcon, UserIcon, BrainCircuit } from './icons/Icons';
+import { Cog8ToothIcon, ShieldCheckIcon, UserIcon, BrainCircuit, SunIcon, MoonIcon } from './icons/Icons';
 
 interface SettingsProps {
   role: 'staff' | 'admin';
   onRoleToggle: () => void;
+  isDarkMode: boolean;
+  onDarkModeToggle: () => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle }) => {
+export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle, isDarkMode, onDarkModeToggle }) => {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
@@ -23,13 +25,13 @@ export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle }) => {
         <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <p className="font-semibold text-slate-700">Persona Selection</p>
-                    <p className="text-sm text-slate-500">Choose your role to switch between Staff and IT Admin views.</p>
+                    <p className="font-semibold text-slate-700 dark:text-slate-200">Persona Selection</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Choose your role to switch between Staff and IT Admin views.</p>
                 </div>
                 <button
                     onClick={onRoleToggle}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 ${
-                        role === 'admin' ? 'bg-brand-primary' : 'bg-slate-200'
+                        role === 'admin' ? 'bg-brand-primary' : 'bg-slate-200 dark:bg-slate-700'
                     }`}
                 >
                     <span
@@ -37,6 +39,29 @@ export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle }) => {
                             role === 'admin' ? 'translate-x-6' : 'translate-x-1'
                         }`}
                     />
+                </button>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
+                <div>
+                    <p className="font-semibold text-slate-700 dark:text-slate-200">Appearance Mode</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Toggle between Light and Dark mode for the interface.</p>
+                </div>
+                <button
+                    onClick={onDarkModeToggle}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700"
+                >
+                    {isDarkMode ? (
+                        <>
+                            <SunIcon className="w-4 h-4 text-amber-500" />
+                            <span className="text-xs font-medium text-slate-200">Light Mode</span>
+                        </>
+                    ) : (
+                        <>
+                            <MoonIcon className="w-4 h-4 text-indigo-500" />
+                            <span className="text-xs font-medium text-slate-700">Dark Mode</span>
+                        </>
+                    )}
                 </button>
             </div>
 

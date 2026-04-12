@@ -23,6 +23,7 @@ export default function App() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [remoteTicketId, setRemoteTicketId] = useState<string | null>(null);
   const [role, setRole] = useState<'staff' | 'admin'>('admin');
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -99,7 +100,14 @@ export default function App() {
       case 'knowledge-base':
         return <KnowledgeBase role={role} />;
       case 'settings':
-        return <Settings role={role} onRoleToggle={() => setRole(role === 'admin' ? 'staff' : 'admin')} />;
+        return (
+            <Settings
+                role={role}
+                onRoleToggle={() => setRole(role === 'admin' ? 'staff' : 'admin')}
+                isDarkMode={isDarkMode}
+                onDarkModeToggle={() => setIsDarkMode(!isDarkMode)}
+            />
+        );
       case 'remote':
         return <RemoteControlView ticketId={remoteTicketId || undefined} />;
       case 'start-remote-session':
@@ -110,7 +118,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-100 font-sans">
+    <div className={`flex h-screen font-sans ${isDarkMode ? 'dark bg-slate-900 text-slate-100' : 'bg-slate-100 text-slate-800'}`}>
       <Sidebar
         currentPage={page}
         setPage={setPage}

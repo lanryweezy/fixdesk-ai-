@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Ticket, TicketStatus, Solution, Activity } from '../types';
 import { Card } from './common/Card';
-import { ArrowUturnLeftIcon, CogIcon, SpinnerIcon, BrainCircuit, PaperAirplaneIcon, ChatBubbleBottomCenterTextIcon, BookmarkIcon } from './icons/Icons';
-import { askAboutTicket } from '../services/geminiService';
+import { ArrowUturnLeftIcon, CogIcon, SpinnerIcon, BrainCircuit, PaperAirplaneIcon, ChatBubbleBottomCenterTextIcon, BookmarkIcon, SparklesIcon } from './icons/Icons';
+import { askAboutTicket, draftAiResponse } from '../services/geminiService';
 import { useToast } from '../services/ToastContext';
 
 interface TicketDetailProps {
@@ -35,11 +35,13 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isResolutionModalOpen, setIsResolutionModalOpen] = useState(false);
   const [resolutionText, setResolutionText] = useState(ticket.resolution || '');
+  const [internalNote, setInternalNote] = useState('');
   const [recommendedSolutions, setRecommendedSolutions] = useState<Solution[]>([]);
   const [isLoadingSolutions, setIsLoadingSolutions] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'ai', content: string }[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [isDrafting, setIsDrafting] = useState(false);
 
   useEffect(() => {
     const fetchRecommendedSolutions = async () => {
@@ -182,8 +184,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
     }
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!chatMessage.trim()) return;
 
     const userMsg = chatMessage;
@@ -198,6 +200,47 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
         setChatHistory(prev => [...prev, { role: 'ai', content: "I'm sorry, I encountered an error. Please try again." }]);
     } finally {
         setIsTyping(false);
+    }
+  };
+
+  const handleSuggestResponse = async () => {
+    setIsDrafting(true);
+    try {
+        const draft = await draftAiResponse(ticket);
+        setChatMessage(draft);
+        addToast('AI Draft generated', 'success');
+    } catch (error) {
+        addToast('Failed to draft response', 'error');
+    } finally {
+        setIsDrafting(false);
+    }
+  };
+
+  const handleAddInternalNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!internalNote.trim()) return;
+
+    setIsUpdatingStatus(true);
+    try {
+        const activity: Activity = {
+            id: Math.random().toString(36).substr(2, 9),
+            timestamp: new Date().toISOString(),
+            type: 'note',
+            message: `Internal Note: ${internalNote}`,
+            user: 'Alex Smith'
+        };
+        const updatedTicket = await window.electronAPI.updateTicket({
+            ...ticket,
+            activities: [...(ticket.activities || []), activity]
+        });
+        setTicket(updatedTicket);
+        if (onUpdate) onUpdate(updatedTicket);
+        setInternalNote('');
+        addToast('Internal note added', 'success');
+    } catch (error) {
+        addToast('Failed to add internal note', 'error');
+    } finally {
+        setIsUpdatingStatus(false);
     }
   };
 
@@ -302,7 +345,27 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
 
           {ticket.activities && ticket.activities.length > 0 && (
             <div className="pt-8 border-t border-slate-200">
-                <h3 className="text-lg font-semibold text-slate-700 mb-6">Activity Timeline</h3>
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200">Activity Timeline</h3>
+                    {role === 'admin' && (
+                        <form onSubmit={handleAddInternalNote} className="flex gap-2">
+                            <input
+                                type="text"
+                                value={internalNote}
+                                onChange={(e) => setInternalNote(e.target.value)}
+                                placeholder="Add internal note..."
+                                className="px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-primary min-w-[200px]"
+                            />
+                            <button
+                                type="submit"
+                                disabled={!internalNote.trim() || isUpdatingStatus}
+                                className="px-3 py-1.5 text-xs font-bold text-white bg-slate-600 hover:bg-slate-700 rounded-lg transition-colors disabled:bg-slate-300"
+                            >
+                                Add
+                            </button>
+                        </form>
+                    )}
+                </div>
                 <div className="flow-root">
                     <ul role="list" className="-mb-8">
                         {ticket.activities.map((activity, idx) => (
@@ -405,13 +468,26 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
                 )}
             </div>
 
+            <div className="flex justify-end mb-2">
+                {role === 'admin' && (
+                    <button
+                        onClick={handleSuggestResponse}
+                        disabled={isDrafting || isTyping}
+                        className="flex items-center gap-1.5 text-xs font-bold text-brand-primary hover:text-brand-secondary transition-colors"
+                    >
+                        <SparklesIcon className="w-3.5 h-3.5" />
+                        {isDrafting ? 'Drafting...' : 'Suggest Professional Response'}
+                    </button>
+                )}
+            </div>
+
             <form onSubmit={handleSendMessage} className="relative">
-                <input
-                    type="text"
+                <textarea
                     value={chatMessage}
                     onChange={(e) => setChatMessage(e.target.value)}
-                    placeholder="Ask a question..."
-                    className="w-full pl-4 pr-12 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent transition-all shadow-sm"
+                    placeholder={role === 'admin' ? "Draft your response..." : "Ask a question..."}
+                    rows={chatMessage.length > 50 ? 3 : 1}
+                    className="w-full pl-4 pr-12 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent transition-all shadow-sm resize-none"
                 />
                 <button
                     type="submit"
