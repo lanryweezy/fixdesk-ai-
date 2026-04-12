@@ -126,3 +126,17 @@ export const ChatBubbleBottomCenterTextIcon: React.FC<IconProps> = ({ className 
         <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3h9m-9 3h9m-6.75 2.25H9.75l-3 3m0-3h2.25c.621 0 1.125-.504 1.125-1.125V4.875c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125H5.625l3 3V16.5h.375a1.125 1.125 0 011.125-1.125z" />
     </svg>
 );
+
+export const BookmarkIcon: React.FC<IconProps> = ({ className = 'w-6 h-6', title, ...rest }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className} {...rest}>
+        {title && <title>{title}</title>}
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+    </svg>
+);
+
+export const Cog8ToothIcon: React.FC<IconProps> = ({ className = 'w-6 h-6', title, ...rest }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className} {...rest}>
+        {title && <title>{title}</title>}
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12a7.5 7.5 0 0015 0m-15 0a7.5 7.5 0 1 1 15 0m-15 0H3m18 0h-1.5M5.999 21.19a.75.75 0 01-1.06-1.06l1.06-1.06a.75.75 0 111.06 1.06l-1.06 1.06zm12.06-12.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 111.06 1.06l-1.06 1.06zm-12.06 0a.75.75 0 011.06-1.06l1.06 1.06a.75.75 0 11-1.06 1.06l-1.06-1.06zm12.06 12.06a.75.75 0 011.06 1.06l-1.06 1.06a.75.75 0 11-1.06-1.06l1.06-1.06zM12 4.5V3m0 18v-1.5m9-9h-1.5M3 12H4.5" />
+    </svg>
+);

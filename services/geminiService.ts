@@ -225,3 +225,35 @@ export const askAboutTicket = async (ticket: any, question: string): Promise<str
     return "I'm sorry, I'm having trouble processing your request right now. Please try again later.";
   }
 };
+
+export const categorizeAndPrioritize = async (title: string, description: string): Promise<{ priority: 'Low' | 'Medium' | 'High', category: string }> => {
+    try {
+        const genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            generationConfig: {
+                responseMimeType: "application/json",
+            }
+        });
+
+        const prompt = `
+            Analyze the following IT support request and determine its priority (Low, Medium, High) and a short category (e.g., VPN, Hardware, Email, Software).
+
+            TITLE: ${title}
+            DESCRIPTION: ${description}
+
+            Respond with ONLY a JSON object in this format:
+            {
+                "priority": "Low" | "Medium" | "High",
+                "category": "string"
+            }
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        return JSON.parse(response.text());
+    } catch (error) {
+        console.error("Error in categorizeAndPrioritize:", error);
+        return { priority: 'Medium', category: 'General' };
+    }
+}

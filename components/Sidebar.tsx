@@ -1,6 +1,8 @@
 import React from 'react';
 import { Page } from '../App';
-import { ChartBarIcon, TicketIcon, BrainCircuit, ComputerDesktopIcon, ShieldCheckIcon, UserGroupIcon } from './icons/Icons';
+import { ChartBarIcon, TicketIcon, BrainCircuit, ComputerDesktopIcon, ShieldCheckIcon, UserGroupIcon, Cog8ToothIcon } from './icons/Icons';
+
+import { Ticket, TicketStatus } from '../types';
 
 interface SidebarProps {
   currentPage: string;
@@ -8,6 +10,7 @@ interface SidebarProps {
   onReportIssue: () => void;
   role: 'staff' | 'admin';
   onRoleToggle: () => void;
+  tickets: Ticket[];
 }
 
 const navItems = [
@@ -15,13 +18,17 @@ const navItems = [
   { name: 'My Tickets', icon: TicketIcon, page: 'tickets', roles: ['staff', 'admin'] },
   { name: 'Knowledge Base', icon: BrainCircuit, page: 'knowledge-base', roles: ['staff', 'admin'] },
   { name: 'Start Remote Session', icon: UserGroupIcon, page: 'start-remote-session', roles: ['staff'] },
+  { name: 'Settings', icon: Cog8ToothIcon, page: 'settings', roles: ['staff', 'admin'] },
 ];
 
 const adminNavItems = [
     { name: 'Remote Control', icon: ShieldCheckIcon, page: 'remote', roles: ['admin'] },
 ]
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReportIssue, role, onRoleToggle }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReportIssue, role, onRoleToggle, tickets }) => {
+  const unassignedCount = tickets.filter(t => !t.assignedTo && t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.AI_RESOLVED).length;
+  const staffActiveCount = tickets.filter(t => t.reportedBy === 'Alex Smith' && t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.AI_RESOLVED).length;
+
   return (
     <div className="w-64 bg-white border-r border-slate-200 flex flex-col p-4">
       <div className="flex items-center gap-2 px-2 mb-8">
@@ -55,7 +62,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
                   }`}
                 >
                   <item.icon className="w-6 h-6" />
-                  {item.name}
+                  <span className="flex-1">{item.name}</span>
+                  {item.page === 'tickets' && (
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        currentPage === 'tickets' ? 'bg-brand-primary text-white' : 'bg-slate-200 text-slate-600'
+                    }`}>
+                        {role === 'admin' ? unassignedCount : staffActiveCount}
+                    </span>
+                  )}
                 </a>
               </li>
             ))}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Ticket, TicketStatus, Solution, Activity } from '../types';
 import { Card } from './common/Card';
-import { ArrowUturnLeftIcon, CogIcon, SpinnerIcon, BrainCircuit, PaperAirplaneIcon, ChatBubbleBottomCenterTextIcon } from './icons/Icons';
+import { ArrowUturnLeftIcon, CogIcon, SpinnerIcon, BrainCircuit, PaperAirplaneIcon, ChatBubbleBottomCenterTextIcon, BookmarkIcon } from './icons/Icons';
 import { askAboutTicket } from '../services/geminiService';
 import { useToast } from '../services/ToastContext';
 
@@ -142,6 +142,39 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
     }
   };
 
+  const handleConvertToKB = async () => {
+    if (!ticket.resolution) return;
+    setIsUpdatingStatus(true);
+    try {
+        const solutionData = {
+            problemDescription: ticket.title,
+            solutionDescription: ticket.resolution,
+            actions: []
+        };
+        await window.electronAPI.createSolution(solutionData);
+
+        const activity: Activity = {
+            id: Math.random().toString(36).substr(2, 9),
+            timestamp: new Date().toISOString(),
+            type: 'note',
+            message: `Converted this resolved ticket into a Knowledge Base solution.`,
+            user: 'Alex Smith'
+        };
+        const updatedTicket = await window.electronAPI.updateTicket({
+            ...ticket,
+            activities: [...(ticket.activities || []), activity]
+        });
+        setTicket(updatedTicket);
+        if (onUpdate) onUpdate(updatedTicket);
+
+        addToast('Added to Knowledge Base', 'success');
+    } catch (error) {
+        addToast('Failed to add to Knowledge Base', 'error');
+    } finally {
+        setIsUpdatingStatus(false);
+    }
+  };
+
   const handleRequestAssistance = () => {
     setIsRequesting(true);
     if (onRequestRemote) {
@@ -248,7 +281,19 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
 
           {resolution && (
             <div>
-              <h3 className="text-lg font-semibold text-slate-700 mb-2">Resolution</h3>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-lg font-semibold text-slate-700">Resolution</h3>
+                {role === 'admin' && (
+                    <button
+                        onClick={handleConvertToKB}
+                        disabled={isUpdatingStatus}
+                        className="flex items-center gap-1.5 text-xs font-bold text-brand-primary hover:text-brand-secondary transition-colors"
+                    >
+                        <BookmarkIcon className="w-3.5 h-3.5" />
+                        Convert to Knowledge Base
+                    </button>
+                )}
+              </div>
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <p className="text-green-800 leading-relaxed">{resolution}</p>
               </div>

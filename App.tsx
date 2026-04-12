@@ -6,13 +6,15 @@ import { Dashboard } from './components/Dashboard';
 import { TicketsList } from './components/TicketsList';
 import { TicketDetail } from './components/TicketDetail';
 import { KnowledgeBase } from './components/KnowledgeBase';
+import { Settings } from './components/Settings';
 import { ReportIssueModal } from './components/ReportIssueModal';
 import { RemoteControlView } from './components/RemoteControlView';
 import { StartRemoteSession } from './components/StartRemoteSession';
-import { Ticket } from './types';
+import { Ticket, Activity } from './types';
 import { BrainCircuit } from './components/icons/Icons';
+import { categorizeAndPrioritize } from './services/geminiService';
 
-export type Page = 'dashboard' | 'tickets' | 'remote' | 'start-remote-session' | 'knowledge-base';
+export type Page = 'dashboard' | 'tickets' | 'remote' | 'start-remote-session' | 'knowledge-base' | 'settings';
 
 export default function App() {
   const [page, setPage] = useState<Page>('dashboard');
@@ -31,11 +33,25 @@ export default function App() {
   }, []);
 
   const handleCreateTicket = async (newTicket: Omit<Ticket, 'id' | 'createdAt' | 'reportedBy'>) => {
+    // AI Auto-categorization
+    const aiInsight = await categorizeAndPrioritize(newTicket.title, newTicket.description);
+
+    const initialActivity: Activity = {
+        id: Math.random().toString(36).substr(2, 9),
+        timestamp: new Date().toISOString(),
+        type: 'note',
+        message: `Ticket created and auto-categorized as ${aiInsight.category} with ${aiInsight.priority} priority.`,
+        user: 'FixDesk AI'
+    };
+
     const ticket: Ticket = {
       ...newTicket,
+      priority: aiInsight.priority,
+      title: `${aiInsight.category}: ${newTicket.title}`,
       id: `TICK-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
       createdAt: new Date().toISOString(),
       reportedBy: 'Alex Smith', // Mocked user
+      activities: [initialActivity]
     };
     const createdTicket = await window.electronAPI.createTicket(ticket);
     setTickets(prevTickets => [createdTicket, ...prevTickets]);
@@ -82,6 +98,8 @@ export default function App() {
         return <TicketsList tickets={tickets} onSelectTicket={handleSelectTicket} role={role} />;
       case 'knowledge-base':
         return <KnowledgeBase role={role} />;
+      case 'settings':
+        return <Settings role={role} onRoleToggle={() => setRole(role === 'admin' ? 'staff' : 'admin')} />;
       case 'remote':
         return <RemoteControlView ticketId={remoteTicketId || undefined} />;
       case 'start-remote-session':
@@ -99,6 +117,7 @@ export default function App() {
         onReportIssue={() => setIsModalOpen(true)}
         role={role}
         onRoleToggle={() => setRole(role === 'admin' ? 'staff' : 'admin')}
+        tickets={tickets}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header role={role} />
