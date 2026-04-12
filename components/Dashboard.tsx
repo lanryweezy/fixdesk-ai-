@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { Card } from './common/Card';
 import { mockAnalyticsData } from '../constants';
@@ -23,60 +23,64 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin' }) => {
   const analytics = mockAnalyticsData;
   
-  const totalTickets = tickets.length;
-  const resolvedTicketsList = tickets.filter(t => t.status === TicketStatus.RESOLVED || t.status === TicketStatus.AI_RESOLVED);
-  const resolvedTicketsCount = resolvedTicketsList.length;
-  
-  const aiResolvedCount = tickets.filter(t => t.status === TicketStatus.AI_RESOLVED).length;
-  const humanResolvedCount = tickets.filter(t => t.status === TicketStatus.RESOLVED).length;
+  const stats = useMemo(() => {
+    const total = tickets.length;
+    const resolved = tickets.filter(t => t.status === TicketStatus.RESOLVED || t.status === TicketStatus.AI_RESOLVED);
+    const aiCount = tickets.filter(t => t.status === TicketStatus.AI_RESOLVED).length;
+    const humanCount = tickets.filter(t => t.status === TicketStatus.RESOLVED).length;
+    const autoRate = resolved.length > 0 ? Math.round((aiCount / resolved.length) * 100) : 0;
 
-  const automationRate = resolvedTicketsCount > 0 ? Math.round((aiResolvedCount / resolvedTicketsCount) * 100) : 0;
-  
-  const resolutionByData = [
-      { name: 'FixDesk AI', value: aiResolvedCount },
-      { name: 'IT Support Team', value: humanResolvedCount }
-  ].filter(item => item.value > 0);
+    return { total, resolvedCount: resolved.length, aiCount, humanCount, autoRate };
+  }, [tickets]);
 
-  // Group tickets by title to get common issues dynamically
-  const issueCounts: Record<string, number> = {};
-  tickets.forEach(ticket => {
-    // Basic grouping by title for now, maybe in the future we'd use something else
-    const category = ticket.title.split(':')[0] || 'Uncategorized';
-    issueCounts[category] = (issueCounts[category] || 0) + 1;
-  });
+  const resolutionByData = useMemo(() => [
+      { name: 'FixDesk AI', value: stats.aiCount },
+      { name: 'IT Support Team', value: stats.humanCount }
+  ].filter(item => item.value > 0), [stats]);
 
-  const dynamicCommonIssues = Object.entries(issueCounts)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 5);
+  const displayIssues = useMemo(() => {
+    const issueCounts: Record<string, number> = {};
+    tickets.forEach(ticket => {
+        const category = ticket.title.split(':')[0] || 'Uncategorized';
+        issueCounts[category] = (issueCounts[category] || 0) + 1;
+    });
 
-  const displayIssues = dynamicCommonIssues.length > 0 ? dynamicCommonIssues : analytics.commonIssues;
+    const dynamic = Object.entries(issueCounts)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 5);
 
-  // Calculate tickets over time (last 7 days)
-  const last7Days = [...Array(7)].map((_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    return d.toISOString().split('T')[0];
-  }).reverse();
+    return dynamic.length > 0 ? dynamic : analytics.commonIssues;
+  }, [tickets, analytics.commonIssues]);
 
-  const ticketsOverTime = last7Days.map(date => ({
-    date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    tickets: tickets.filter(t => t.createdAt.startsWith(date)).length
-  }));
+  const ticketsOverTime = useMemo(() => {
+    const last7Days = [...Array(7)].map((_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        return d.toISOString().split('T')[0];
+    }).reverse();
 
-  const allActivities = tickets
-    .flatMap(t => (t.activities || []).map(a => ({ ...a, ticketTitle: t.title, ticketId: t.id })))
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-    .slice(0, 5);
+    return last7Days.map(date => ({
+        date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        tickets: tickets.filter(t => t.createdAt.startsWith(date)).length
+    }));
+  }, [tickets]);
+
+  const allActivities = useMemo(() => {
+    return tickets
+        .flatMap(t => (t.activities || []).map(a => ({ ...a, ticketTitle: t.title, ticketId: t.id })))
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 5);
+  }, [tickets]);
 
   return (
     <div className="space-y-8">
       <h2 className="text-3xl font-bold text-slate-800">Analytics & IT Insights</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Total Tickets" value={totalTickets} subtext="All-time ticket count" />
-        <StatCard title="Tickets Resolved" value={resolvedTicketsCount} subtext="Total resolved tickets" />
-        <StatCard title="Automation Rate" value={`${automationRate}%`} subtext="Resolved by FixDesk AI" />
+        <StatCard title="Total Tickets" value={stats.total} subtext="All-time ticket count" />
+        <StatCard title="Tickets Resolved" value={stats.resolvedCount} subtext="Total resolved tickets" />
+        <StatCard title="Automation Rate" value={`${stats.autoRate}%`} subtext="Resolved by FixDesk AI" />
         <StatCard title="Avg. Resolution Time" value={analytics.avgResolutionTime} subtext="For human-handled tickets" />
       </div>
 

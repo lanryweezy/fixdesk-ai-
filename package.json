@@ -27,7 +27,7 @@
     }
   },
   "dependencies": {
-    "@google/genai": "latest",
+    "@google/generative-ai": "^0.24.1",
     "lowdb": "^7.0.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

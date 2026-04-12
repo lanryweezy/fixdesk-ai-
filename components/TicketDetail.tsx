@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Ticket, TicketStatus, Solution, Activity } from '../types';
 import { Card } from './common/Card';
 import { ArrowUturnLeftIcon, CogIcon, SpinnerIcon, BrainCircuit, PaperAirplaneIcon, ChatBubbleBottomCenterTextIcon, BookmarkIcon, SparklesIcon, ListBulletIcon } from './icons/Icons';
-import { askAboutTicket, draftAiResponse, summarizeTicket } from '../services/geminiService';
 import { useToast } from '../services/ToastContext';
 
 interface TicketDetailProps {
@@ -196,7 +195,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
     setIsTyping(true);
 
     try {
-        const aiResponse = await askAboutTicket(ticket, userMsg);
+        const aiResponse = await window.electronAPI.askAboutTicket(ticket, userMsg);
         setChatHistory(prev => [...prev, { role: 'ai', content: aiResponse }]);
     } catch (error) {
         setChatHistory(prev => [...prev, { role: 'ai', content: "I'm sorry, I encountered an error. Please try again." }]);
@@ -208,7 +207,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
   const handleSuggestResponse = async () => {
     setIsDrafting(true);
     try {
-        const draft = await draftAiResponse(ticket);
+        const draft = await window.electronAPI.draftAiResponse(ticket);
         setChatMessage(draft);
         addToast('AI Draft generated', 'success');
     } catch (error) {
@@ -221,7 +220,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
   const handleSummarize = async () => {
     setIsSummarizing(true);
     try {
-        const result = await summarizeTicket(ticket);
+        const result = await window.electronAPI.summarizeTicket(ticket);
         setSummary(result);
         addToast('Ticket summary ready', 'success');
     } catch (error) {

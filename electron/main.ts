@@ -3,8 +3,9 @@ import * as path from 'node:path'
 import robot from 'robotjs'
 import { Low } from 'lowdb'
 import { JSONFilePreset } from 'lowdb/node'
-import type { Ticket, Solution } from '../types'
+import type { Ticket, Solution, RemoteSession, TicketStatus } from '../types'
 import { exec } from 'child_process'
+import { GoogleGenerativeAI } from "@google/generative-ai"
 
 // The built directory structure
 //
@@ -29,10 +30,19 @@ type Data = {
   tickets: Ticket[];
   solutions: Solution[];
   remoteSessions: RemoteSession[];
+  settings: {
+    role: 'staff' | 'admin';
+    isDarkMode: boolean;
+  }
 }
 let db: Low<Data>;
 const initDatabase = async () => {
-    const defaultData: Data = { tickets: [], solutions: [], remoteSessions: [] };
+    const defaultData: Data = {
+        tickets: [],
+        solutions: [],
+        remoteSessions: [],
+        settings: { role: 'admin', isDarkMode: false }
+    };
     const dbPath = path.join(app.getPath('userData'), 'db.json');
     db = await JSONFilePreset<Data>(dbPath, defaultData);
 }
@@ -160,6 +170,16 @@ ipcMain.handle('db-delete-remote-session', async (event, ticketId) => {
     db.data.remoteSessions = db.data.remoteSessions.filter(s => s.ticketId !== ticketId);
     await db.write();
 });
+
+ipcMain.handle('db-get-settings', () => {
+    return db.data.settings;
+});
+
+ipcMain.handle('db-update-settings', async (event, settings) => {
+    db.data.settings = { ...db.data.settings, ...settings };
+    await db.write();
+    return db.data.settings;
+});
 // --- End Database Handlers ---
 
 // --- Command Execution Handler ---
@@ -187,6 +207,86 @@ ipcMain.handle('execute-command', async (event, commands: string[]) => {
   return results;
 });
 // --- End Command Execution Handler ---
+
+// --- Gemini AI Handlers ---
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+
+ipcMain.handle('ai-categorize-prioritize', async (event, { title, description }) => {
+    try {
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
+        const prompt = `Analyze this IT request. Determine priority (Low, Medium, High) and a short category.
+            TITLE: ${title}
+            DESCRIPTION: ${description}
+            Respond with JSON: { "priority": "Low" | "Medium" | "High", "category": "string" }`;
+        const result = await model.generateContent(prompt);
+        return JSON.parse(result.response.text());
+    } catch (error) {
+        console.error("AI Error:", error);
+        return { priority: 'Medium', category: 'General' };
+    }
+});
+
+ipcMain.handle('ai-ask-about-ticket', async (event, { ticket, question }) => {
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `You are an IT support assistant. Answer the user question about this ticket.
+            TICKET: ${JSON.stringify(ticket)}
+            QUESTION: ${question}`;
+        const result = await model.generateContent(prompt);
+        return result.response.text();
+    } catch (error) {
+        return "I'm sorry, I couldn't process that.";
+    }
+});
+
+ipcMain.handle('ai-draft-response', async (event, ticket) => {
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `Draft a professional response for this ticket: ${JSON.stringify(ticket)}`;
+        const result = await model.generateContent(prompt);
+        return result.response.text();
+    } catch (error) {
+        return "Failed to draft response.";
+    }
+});
+
+ipcMain.handle('ai-summarize-ticket', async (event, ticket) => {
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `Summarize this ticket in exactly 3 sentences: ${JSON.stringify(ticket)}`;
+        const result = await model.generateContent(prompt);
+        return result.response.text();
+    } catch (error) {
+        return "Failed to summarize.";
+    }
+});
+
+ipcMain.handle('ai-start-conversation', async (event, { videoBase64, prompt }) => {
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        // Minimal implementation for now to fix the dependency issue
+        const result = await model.generateContent([
+            { text: `Analyze this IT issue: ${prompt}` },
+            { inlineData: { mimeType: "video/webm", data: videoBase64 } }
+        ]);
+        // Mocking a structured response for now
+        return {
+            type: 'analysis',
+            data: {
+                title: prompt,
+                description: result.response.text(),
+                status: 'New',
+                priority: 'Medium'
+            }
+        };
+    } catch (error) {
+        return { type: 'error', message: 'AI Analysis failed.' };
+    }
+});
+// --- End Gemini AI Handlers ---
 
 // --- RobotJS Handlers ---
 ipcMain.on('robot-mouse-move', (event, { x, y }) => {

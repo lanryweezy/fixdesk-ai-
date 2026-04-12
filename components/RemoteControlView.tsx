@@ -62,6 +62,7 @@ export const RemoteControlView: React.FC<RemoteControlViewProps> = ({ ticketId }
 
             peer.on('connect', () => {
                 setIsConnected(true);
+                addToast('Connected to user screen', 'success');
             });
 
             peer.on('close', () => {

@@ -66,9 +66,10 @@ interface TicketsListProps {
   tickets: Ticket[];
   onSelectTicket: (ticket: Ticket) => void;
   role?: 'staff' | 'admin';
+  onRefresh?: () => void;
 }
 
-export const TicketsList: React.FC<TicketsListProps> = ({ tickets, onSelectTicket, role = 'admin' }) => {
+export const TicketsList: React.FC<TicketsListProps> = ({ tickets, onSelectTicket, role = 'admin', onRefresh }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<TicketStatus | 'All'>('All');
   const [priorityFilter, setPriorityFilter] = useState<'Low' | 'Medium' | 'High' | 'All'>('All');
@@ -100,8 +101,7 @@ export const TicketsList: React.FC<TicketsListProps> = ({ tickets, onSelectTicke
         await window.electronAPI.updateTicketStatus(id, status);
     }
     setSelectedTicketIds(new Set());
-    // The parent App.tsx will need to refresh tickets, or we just notify.
-    // For now, assume a refresh happens on back or we could pass a refresh prop.
+    if (onRefresh) onRefresh();
   };
 
   return (

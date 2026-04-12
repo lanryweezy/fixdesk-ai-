@@ -15,6 +15,13 @@ export interface ElectronApi {
     upsertRemoteSession: (session: RemoteSession) => Promise<RemoteSession>;
     getRemoteSession: (ticketId: string) => Promise<RemoteSession | undefined>;
     deleteRemoteSession: (ticketId: string) => Promise<void>;
+    getSettings: () => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean }>;
+    updateSettings: (settings: Partial<{ role: 'staff' | 'admin', isDarkMode: boolean }>) => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean }>;
+    categorizeAndPrioritize: (title: string, description: string) => Promise<{ priority: 'Low' | 'Medium' | 'High', category: string }>;
+    askAboutTicket: (ticket: Ticket, question: string) => Promise<string>;
+    draftAiResponse: (ticket: Ticket) => Promise<string>;
+    summarizeTicket: (ticket: Ticket) => Promise<string>;
+    startConversation: (videoBase64: string, prompt: string) => Promise<any>;
 }
 
 declare global {

@@ -22,7 +22,13 @@ export const StartRemoteSession: React.FC<StartRemoteSessionProps> = ({ ticketId
                     handleConnect(session.answer);
                 }
             }, 3000);
-            return () => clearInterval(interval);
+            return () => {
+                clearInterval(interval);
+                // Cleanup session data when component unmounts if connected
+                if (isConnected) {
+                    window.electronAPI.deleteRemoteSession(ticketId);
+                }
+            };
         }
     }, [ticketId, offer, isConnected, answer]);
 
@@ -66,6 +72,10 @@ export const StartRemoteSession: React.FC<StartRemoteSessionProps> = ({ ticketId
 
             peer.on('connect', () => {
                 setIsConnected(true);
+                addToast('IT Admin connected to your session', 'success');
+                if (ticketId) {
+                    window.electronAPI.deleteRemoteSession(ticketId);
+                }
             });
 
             peer.on('data', (data) => {

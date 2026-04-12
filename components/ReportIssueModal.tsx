@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { startConversation, continueConversation, AnalysisResult, ConversationResult } from '../services/geminiService';
 import { Ticket, TicketStatus } from '../types';
 import { ComputerDesktopIcon, BrainCircuit, CheckCircleIcon, XCircleIcon } from './icons/Icons';
 import { useToast } from '../services/ToastContext';
@@ -106,7 +105,13 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
             return;
         }
 
-        const result = await startConversation(videoBlob, prompt);
+        const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+            reader.readAsDataURL(videoBlob);
+        });
+
+        const result = await window.electronAPI.startConversation(base64, prompt);
         handleConversationResult(result);
       };
 

@@ -12,7 +12,6 @@ import { RemoteControlView } from './components/RemoteControlView';
 import { StartRemoteSession } from './components/StartRemoteSession';
 import { Ticket, Activity } from './types';
 import { BrainCircuit } from './components/icons/Icons';
-import { categorizeAndPrioritize } from './services/geminiService';
 
 export type Page = 'dashboard' | 'tickets' | 'remote' | 'start-remote-session' | 'knowledge-base' | 'settings';
 
@@ -26,16 +25,24 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
-    const fetchTickets = async () => {
-      const storedTickets = await window.electronAPI.getTickets();
-      setTickets(storedTickets);
+    const initApp = async () => {
+        // Load tickets
+        const storedTickets = await window.electronAPI.getTickets();
+        setTickets(storedTickets);
+
+        // Load settings
+        const storedSettings = await window.electronAPI.getSettings();
+        if (storedSettings) {
+            setRole(storedSettings.role);
+            setIsDarkMode(storedSettings.isDarkMode);
+        }
     };
-    fetchTickets();
+    initApp();
   }, []);
 
   const handleCreateTicket = async (newTicket: Omit<Ticket, 'id' | 'createdAt' | 'reportedBy'>) => {
     // AI Auto-categorization
-    const aiInsight = await categorizeAndPrioritize(newTicket.title, newTicket.description);
+    const aiInsight = await window.electronAPI.categorizeAndPrioritize(newTicket.title, newTicket.description);
 
     const initialActivity: Activity = {
         id: Math.random().toString(36).substr(2, 9),
@@ -65,12 +72,15 @@ export default function App() {
     setSelectedTicket(ticket);
   }, []);
 
-  const handleBackToList = useCallback(async () => {
-    setSelectedTicket(null);
-    // Refresh tickets when going back to list to ensure we have latest data
+  const refreshTickets = useCallback(async () => {
     const storedTickets = await window.electronAPI.getTickets();
     setTickets(storedTickets);
   }, []);
+
+  const handleBackToList = useCallback(async () => {
+    setSelectedTicket(null);
+    refreshTickets();
+  }, [refreshTickets]);
   
   const handleTicketUpdate = useCallback((updatedTicket: Ticket) => {
     setTickets(prev => prev.map(t => t.id === updatedTicket.id ? updatedTicket : t));
@@ -81,6 +91,18 @@ export default function App() {
     setRemoteTicketId(ticketId);
     setPage('start-remote-session');
   }, []);
+
+  const handleRoleToggle = useCallback(async () => {
+    const newRole = role === 'admin' ? 'staff' : 'admin';
+    setRole(newRole);
+    await window.electronAPI.updateSettings({ role: newRole });
+  }, [role]);
+
+  const handleDarkModeToggle = useCallback(async () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    await window.electronAPI.updateSettings({ isDarkMode: newMode });
+  }, [isDarkMode]);
 
   const renderPage = () => {
     if (page === 'tickets' && selectedTicket) {
@@ -96,16 +118,16 @@ export default function App() {
       case 'dashboard':
         return <Dashboard tickets={tickets} role={role} />;
       case 'tickets':
-        return <TicketsList tickets={tickets} onSelectTicket={handleSelectTicket} role={role} />;
+        return <TicketsList tickets={tickets} onSelectTicket={handleSelectTicket} role={role} onRefresh={refreshTickets} />;
       case 'knowledge-base':
         return <KnowledgeBase role={role} />;
       case 'settings':
         return (
             <Settings
                 role={role}
-                onRoleToggle={() => setRole(role === 'admin' ? 'staff' : 'admin')}
+                onRoleToggle={handleRoleToggle}
                 isDarkMode={isDarkMode}
-                onDarkModeToggle={() => setIsDarkMode(!isDarkMode)}
+                onDarkModeToggle={handleDarkModeToggle}
             />
         );
       case 'remote':
@@ -124,7 +146,7 @@ export default function App() {
         setPage={setPage}
         onReportIssue={() => setIsModalOpen(true)}
         role={role}
-        onRoleToggle={() => setRole(role === 'admin' ? 'staff' : 'admin')}
+        onRoleToggle={handleRoleToggle}
         tickets={tickets}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
