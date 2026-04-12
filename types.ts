@@ -7,6 +7,14 @@ export enum TicketStatus {
   AI_RESOLVED = 'AI Resolved'
 }
 
+export interface Activity {
+    id: string;
+    timestamp: string;
+    type: 'status_change' | 'assignment' | 'note' | 'resolution';
+    message: string;
+    user: string;
+}
+
 export interface Ticket {
   id: string;
   title: string;
@@ -19,6 +27,7 @@ export interface Ticket {
   videoUrl?: string; // a mock url
   logs?: string[];
   priority: 'Low' | 'Medium' | 'High';
+  activities?: Activity[];
 }
 
 export interface RecordedAction {

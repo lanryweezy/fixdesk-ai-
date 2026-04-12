@@ -1,12 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Solution } from '../types';
 import { Card } from './common/Card';
-import { BrainCircuit, SpinnerIcon } from './icons/Icons';
+import { BrainCircuit, SpinnerIcon, XCircleIcon } from './icons/Icons';
+import { useToast } from '../services/ToastContext';
 
-export const KnowledgeBase: React.FC = () => {
+interface KnowledgeBaseProps {
+    role?: 'staff' | 'admin';
+}
+
+export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ role = 'admin' }) => {
+  const { addToast } = useToast();
   const [solutions, setSolutions] = useState<Solution[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newProblem, setNewProblem] = useState('');
+  const [newSolution, setNewSolution] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const fetchSolutions = async () => {
@@ -28,10 +38,40 @@ export const KnowledgeBase: React.FC = () => {
     s.solutionDescription.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleAddSolution = async () => {
+    if (!newProblem.trim() || !newSolution.trim()) return;
+    setIsSaving(true);
+    try {
+        const solutionData = {
+            problemDescription: newProblem,
+            solutionDescription: newSolution,
+            actions: [] // Manual entry has no recorded actions
+        };
+        const created = await window.electronAPI.createSolution(solutionData);
+        setSolutions(prev => [created, ...prev]);
+        setIsModalOpen(false);
+        setNewProblem('');
+        setNewSolution('');
+        addToast('Solution added successfully', 'success');
+    } catch (error) {
+        addToast('Failed to add solution', 'error');
+    } finally {
+        setIsSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-3xl font-bold text-slate-800">Knowledge Base</h2>
+        {role === 'admin' && (
+            <button
+                onClick={() => setIsModalOpen(true)}
+                className="bg-brand-primary hover:bg-brand-primary/90 text-white font-semibold py-2 px-4 rounded-lg shadow-sm transition-all"
+            >
+                Add Manual Solution
+            </button>
+        )}
       </div>
 
       <div className="relative">
@@ -84,6 +124,56 @@ export const KnowledgeBase: React.FC = () => {
                <p className="text-slate-500">No solutions found matching your search.</p>
             </div>
           )}
+        </div>
+      )}
+
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all animate-in fade-in zoom-in duration-200">
+                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <h3 className="text-lg font-bold text-slate-800">Add to Knowledge Base</h3>
+                    <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                        <XCircleIcon className="w-6 h-6" />
+                    </button>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1">Problem Description</label>
+                        <input
+                            type="text"
+                            value={newProblem}
+                            onChange={(e) => setNewProblem(e.target.value)}
+                            placeholder="e.g., Cannot connect to VPN"
+                            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-primary outline-none transition-all"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1">Solution Description</label>
+                        <textarea
+                            value={newSolution}
+                            onChange={(e) => setNewSolution(e.target.value)}
+                            rows={4}
+                            placeholder="Describe the steps to fix this problem..."
+                            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-primary outline-none transition-all resize-none"
+                        />
+                    </div>
+                </div>
+                <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                    <button
+                        onClick={() => setIsModalOpen(false)}
+                        className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleAddSolution}
+                        disabled={!newProblem.trim() || !newSolution.trim() || isSaving}
+                        className="px-6 py-2 text-sm font-bold text-white bg-brand-primary hover:bg-brand-primary/90 rounded-lg transition-colors shadow-sm disabled:bg-slate-300"
+                    >
+                        {isSaving ? 'Saving...' : 'Save Solution'}
+                    </button>
+                </div>
+            </div>
         </div>
       )}
     </div>

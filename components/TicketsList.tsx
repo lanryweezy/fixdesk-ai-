@@ -65,20 +65,24 @@ const TicketItem: React.FC<TicketItemProps> = ({ ticket, onSelect }) => {
 interface TicketsListProps {
   tickets: Ticket[];
   onSelectTicket: (ticket: Ticket) => void;
+  role?: 'staff' | 'admin';
 }
 
-export const TicketsList: React.FC<TicketsListProps> = ({ tickets, onSelectTicket }) => {
+export const TicketsList: React.FC<TicketsListProps> = ({ tickets, onSelectTicket, role = 'admin' }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<TicketStatus | 'All'>('All');
   const [priorityFilter, setPriorityFilter] = useState<'Low' | 'Medium' | 'High' | 'All'>('All');
 
   const filteredTickets = tickets.filter(ticket => {
+    // Role-based visibility: Staff only see their own tickets
+    const matchesRole = role === 'admin' || ticket.reportedBy === 'Alex Smith'; // Mocked current user
+
     const matchesSearch = ticket.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           ticket.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           ticket.id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'All' || ticket.status === statusFilter;
     const matchesPriority = priorityFilter === 'All' || ticket.priority === priorityFilter;
-    return matchesSearch && matchesStatus && matchesPriority;
+    return matchesRole && matchesSearch && matchesStatus && matchesPriority;
   });
 
   return (

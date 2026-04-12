@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Ticket, TicketStatus, Solution } from '../types';
+import { Ticket, TicketStatus, Solution, Activity } from '../types';
 import { Card } from './common/Card';
-import { ArrowUturnLeftIcon, CogIcon, SpinnerIcon, BrainCircuit, PaperAirplaneIcon } from './icons/Icons';
+import { ArrowUturnLeftIcon, CogIcon, SpinnerIcon, BrainCircuit, PaperAirplaneIcon, ChatBubbleBottomCenterTextIcon } from './icons/Icons';
 import { askAboutTicket } from '../services/geminiService';
 import { useToast } from '../services/ToastContext';
 
@@ -65,10 +65,22 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
     }
     setIsUpdatingStatus(true);
     try {
-      const updatedTicket = await window.electronAPI.updateTicketStatus(ticket.id, newStatus);
-      setTicket(updatedTicket);
-      if (onUpdate) onUpdate(updatedTicket);
-      addToast(`Status updated to ${newStatus}`, 'success');
+        const activity: Activity = {
+            id: Math.random().toString(36).substr(2, 9),
+            timestamp: new Date().toISOString(),
+            type: 'status_change',
+            message: `Changed status from ${ticket.status} to ${newStatus}`,
+            user: 'Alex Smith'
+        };
+        const updatedTicketData = {
+            ...ticket,
+            status: newStatus,
+            activities: [...(ticket.activities || []), activity]
+        };
+        const updatedTicket = await window.electronAPI.updateTicket(updatedTicketData);
+        setTicket(updatedTicket);
+        if (onUpdate) onUpdate(updatedTicket);
+        addToast(`Status updated to ${newStatus}`, 'success');
     } catch (error) {
       addToast(`Failed to update status: ${(error as Error).message}`, 'error');
     } finally {
@@ -79,10 +91,18 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
   const handleSaveResolution = async () => {
     setIsUpdatingStatus(true);
     try {
+        const activity: Activity = {
+            id: Math.random().toString(36).substr(2, 9),
+            timestamp: new Date().toISOString(),
+            type: 'resolution',
+            message: `Resolved issue: ${resolutionText}`,
+            user: 'Alex Smith'
+        };
         const updatedTicket = {
             ...ticket,
             status: TicketStatus.RESOLVED,
-            resolution: resolutionText
+            resolution: resolutionText,
+            activities: [...(ticket.activities || []), activity]
         };
         const savedTicket = await window.electronAPI.updateTicket(updatedTicket);
         setTicket(savedTicket);
@@ -99,9 +119,17 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
   const handleAssignToMe = async () => {
     setIsUpdatingStatus(true);
     try {
+        const activity: Activity = {
+            id: Math.random().toString(36).substr(2, 9),
+            timestamp: new Date().toISOString(),
+            type: 'assignment',
+            message: `Assigned ticket to Alex Smith`,
+            user: 'Alex Smith'
+        };
         const updatedTicket = {
             ...ticket,
-            assignedTo: 'Alex Smith' // Mocked user
+            assignedTo: 'Alex Smith', // Mocked user
+            activities: [...(ticket.activities || []), activity]
         };
         const savedTicket = await window.electronAPI.updateTicket(updatedTicket);
         setTicket(savedTicket);
@@ -227,9 +255,49 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
             </div>
           )}
 
+          {ticket.activities && ticket.activities.length > 0 && (
+            <div className="pt-8 border-t border-slate-200">
+                <h3 className="text-lg font-semibold text-slate-700 mb-6">Activity Timeline</h3>
+                <div className="flow-root">
+                    <ul role="list" className="-mb-8">
+                        {ticket.activities.map((activity, idx) => (
+                            <li key={activity.id}>
+                                <div className="relative pb-8">
+                                    {idx !== ticket.activities!.length - 1 ? (
+                                        <span className="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+                                    ) : null}
+                                    <div className="relative flex space-x-3">
+                                        <div>
+                                            <span className={`h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white ${
+                                                activity.type === 'status_change' ? 'bg-blue-500' :
+                                                activity.type === 'resolution' ? 'bg-green-500' :
+                                                'bg-gray-400'
+                                            }`}>
+                                                <ChatBubbleBottomCenterTextIcon className="h-5 w-5 text-white" aria-hidden="true" />
+                                            </span>
+                                        </div>
+                                        <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
+                                            <div>
+                                                <p className="text-sm text-gray-500">
+                                                    {activity.message} <span className="font-medium text-gray-900">by {activity.user}</span>
+                                                </p>
+                                            </div>
+                                            <div className="whitespace-nowrap text-right text-sm text-gray-500">
+                                                <time dateTime={activity.timestamp}>{new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            </div>
+          )}
+
           {logs && logs.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold text-slate-700 mb-2">Diagnostics & Activity Log</h3>
+              <h3 className="text-lg font-semibold text-slate-700 mb-2">Diagnostics Log</h3>
               <div className="bg-slate-100 border border-slate-200 rounded-lg p-4 font-mono text-xs text-slate-600 space-y-2">
                 {logs.map((log, index) => <p key={index}>{log}</p>)}
               </div>

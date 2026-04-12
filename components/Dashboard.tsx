@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { Card } from './common/Card';
 import { mockAnalyticsData } from '../constants';
 import { Ticket, TicketStatus } from '../types';
@@ -50,6 +50,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets }) => {
 
   const displayIssues = dynamicCommonIssues.length > 0 ? dynamicCommonIssues : analytics.commonIssues;
 
+  // Calculate tickets over time (last 7 days)
+  const last7Days = [...Array(7)].map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    return d.toISOString().split('T')[0];
+  }).reverse();
+
+  const ticketsOverTime = last7Days.map(date => ({
+    date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    tickets: tickets.filter(t => t.createdAt.startsWith(date)).length
+  }));
+
   return (
     <div className="space-y-8">
       <h2 className="text-3xl font-bold text-slate-800">Analytics & IT Insights</h2>
@@ -62,6 +74,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <Card className="lg:col-span-5">
+            <h3 className="text-lg font-semibold text-slate-700 mb-4">Tickets Created (Last 7 Days)</h3>
+            <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={ticketsOverTime}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                    <Tooltip
+                        contentStyle={{backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '0.8rem', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+                    />
+                    <Line type="monotone" dataKey="tickets" stroke="#4F46E5" strokeWidth={3} dot={{ fill: '#4F46E5', strokeWidth: 2, r: 4, stroke: '#fff' }} activeDot={{ r: 6, strokeWidth: 0 }} />
+                </LineChart>
+            </ResponsiveContainer>
+        </Card>
+
         <Card className="lg:col-span-3">
           <h3 className="text-lg font-semibold text-slate-700 mb-4">Most Common Issues</h3>
           <ResponsiveContainer width="100%" height={300}>

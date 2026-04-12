@@ -79,9 +79,9 @@ export default function App() {
       case 'dashboard':
         return <Dashboard tickets={tickets} />;
       case 'tickets':
-        return <TicketsList tickets={tickets} onSelectTicket={handleSelectTicket} />;
+        return <TicketsList tickets={tickets} onSelectTicket={handleSelectTicket} role={role} />;
       case 'knowledge-base':
-        return <KnowledgeBase />;
+        return <KnowledgeBase role={role} />;
       case 'remote':
         return <RemoteControlView ticketId={remoteTicketId || undefined} />;
       case 'start-remote-session':
