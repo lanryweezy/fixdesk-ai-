@@ -287,3 +287,31 @@ export const draftAiResponse = async (ticket: any): Promise<string> => {
         return "I'm sorry, I could not draft a response at this time.";
     }
 }
+
+export const summarizeTicket = async (ticket: any): Promise<string> => {
+    try {
+        const genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+        const prompt = `
+            You are an IT support assistant for "FixDesk AI".
+            Summarize the following support ticket into exactly 3 concise sentences.
+            Focus on the core problem, the current status, and any key actions taken so far.
+
+            TICKET DETAILS:
+            Title: ${ticket.title}
+            Description: ${ticket.description}
+            Status: ${ticket.status}
+            Activities: ${JSON.stringify(ticket.activities || [])}
+
+            Respond with ONLY the 3-sentence summary.
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        return response.text();
+    } catch (error) {
+        console.error("Error in summarizeTicket:", error);
+        return "I'm sorry, I could not summarize the ticket at this time.";
+    }
+}

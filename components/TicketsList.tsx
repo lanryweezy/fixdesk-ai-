@@ -72,6 +72,7 @@ export const TicketsList: React.FC<TicketsListProps> = ({ tickets, onSelectTicke
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<TicketStatus | 'All'>('All');
   const [priorityFilter, setPriorityFilter] = useState<'Low' | 'Medium' | 'High' | 'All'>('All');
+  const [selectedTicketIds, setSelectedTicketIds] = useState<Set<string>>(new Set());
 
   const filteredTickets = tickets.filter(ticket => {
     // Role-based visibility: Staff only see their own tickets
@@ -85,8 +86,26 @@ export const TicketsList: React.FC<TicketsListProps> = ({ tickets, onSelectTicke
     return matchesRole && matchesSearch && matchesStatus && matchesPriority;
   });
 
+  const toggleSelect = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newSelected = new Set(selectedTicketIds);
+    if (newSelected.has(id)) newSelected.delete(id);
+    else newSelected.add(id);
+    setSelectedTicketIds(newSelected);
+  };
+
+  const handleBulkStatusChange = async (status: TicketStatus) => {
+    // In a real app, this would be a bulk IPC call
+    for (const id of selectedTicketIds) {
+        await window.electronAPI.updateTicketStatus(id, status);
+    }
+    setSelectedTicketIds(new Set());
+    // The parent App.tsx will need to refresh tickets, or we just notify.
+    // For now, assume a refresh happens on back or we could pass a refresh prop.
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 className="text-3xl font-bold text-slate-800">My Tickets</h2>
         <div className="flex flex-wrap gap-3 w-full md:w-auto">
@@ -121,12 +140,53 @@ export const TicketsList: React.FC<TicketsListProps> = ({ tickets, onSelectTicke
       {filteredTickets.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {filteredTickets.map((ticket) => (
-            <TicketItem key={ticket.id} ticket={ticket} onSelect={onSelectTicket} />
+                <div key={ticket.id} className="relative group">
+                    {role === 'admin' && (
+                        <div
+                            onClick={(e) => toggleSelect(ticket.id, e)}
+                            className={`absolute top-3 left-3 z-10 w-5 h-5 rounded border flex items-center justify-center cursor-pointer transition-all ${
+                                selectedTicketIds.has(ticket.id) ? 'bg-brand-primary border-brand-primary' : 'bg-white/50 border-slate-300 opacity-0 group-hover:opacity-100'
+                            }`}
+                        >
+                            {selectedTicketIds.has(ticket.id) && (
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3.5 h-3.5 text-white">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                </svg>
+                            )}
+                        </div>
+                    )}
+                    <TicketItem ticket={ticket} onSelect={onSelectTicket} />
+                </div>
             ))}
         </div>
       ) : (
         <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
             <p className="text-slate-500">No tickets found matching your criteria.</p>
+        </div>
+      )}
+
+      {selectedTicketIds.size > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 z-50 animate-in slide-in-from-bottom-4 duration-300">
+            <div className="flex items-center gap-3 pr-6 border-r border-slate-700">
+                <span className="bg-brand-primary text-[10px] font-bold px-2 py-0.5 rounded-full">{selectedTicketIds.size}</span>
+                <span className="text-sm font-medium">Tickets Selected</span>
+            </div>
+            <div className="flex items-center gap-4">
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Bulk Actions:</p>
+                <select
+                    onChange={(e) => handleBulkStatusChange(e.target.value as TicketStatus)}
+                    className="bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-1.5 focus:ring-2 focus:ring-brand-primary outline-none"
+                >
+                    <option value="">Update Status...</option>
+                    {Object.values(TicketStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <button
+                    onClick={() => setSelectedTicketIds(new Set())}
+                    className="text-xs text-slate-400 hover:text-white transition-colors"
+                >
+                    Clear
+                </button>
+            </div>
         </div>
       )}
     </div>

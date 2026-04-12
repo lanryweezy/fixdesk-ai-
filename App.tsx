@@ -94,7 +94,7 @@ export default function App() {
     }
     switch (page) {
       case 'dashboard':
-        return <Dashboard tickets={tickets} />;
+        return <Dashboard tickets={tickets} role={role} />;
       case 'tickets':
         return <TicketsList tickets={tickets} onSelectTicket={handleSelectTicket} role={role} />;
       case 'knowledge-base':

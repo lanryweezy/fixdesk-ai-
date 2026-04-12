@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Ticket, TicketStatus, Solution, Activity } from '../types';
 import { Card } from './common/Card';
-import { ArrowUturnLeftIcon, CogIcon, SpinnerIcon, BrainCircuit, PaperAirplaneIcon, ChatBubbleBottomCenterTextIcon, BookmarkIcon, SparklesIcon } from './icons/Icons';
-import { askAboutTicket, draftAiResponse } from '../services/geminiService';
+import { ArrowUturnLeftIcon, CogIcon, SpinnerIcon, BrainCircuit, PaperAirplaneIcon, ChatBubbleBottomCenterTextIcon, BookmarkIcon, SparklesIcon, ListBulletIcon } from './icons/Icons';
+import { askAboutTicket, draftAiResponse, summarizeTicket } from '../services/geminiService';
 import { useToast } from '../services/ToastContext';
 
 interface TicketDetailProps {
@@ -42,6 +42,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'ai', content: string }[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [isDrafting, setIsDrafting] = useState(false);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
 
   useEffect(() => {
     const fetchRecommendedSolutions = async () => {
@@ -216,6 +218,19 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
     }
   };
 
+  const handleSummarize = async () => {
+    setIsSummarizing(true);
+    try {
+        const result = await summarizeTicket(ticket);
+        setSummary(result);
+        addToast('Ticket summary ready', 'success');
+    } catch (error) {
+        addToast('Failed to summarize ticket', 'error');
+    } finally {
+        setIsSummarizing(false);
+    }
+  };
+
   const handleAddInternalNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!internalNote.trim()) return;
@@ -260,9 +275,21 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
 
       <Card className="p-8">
         <div className="flex justify-between items-start">
-          <div>
-            <p className="text-sm text-slate-500">{id}</p>
-            <h2 className="text-3xl font-bold text-slate-800 mt-1">{title}</h2>
+          <div className="flex-1">
+            <div className="flex items-center gap-3">
+                <p className="text-sm text-slate-500">{id}</p>
+                {role === 'admin' && (
+                    <button
+                        onClick={handleSummarize}
+                        disabled={isSummarizing}
+                        className="flex items-center gap-1.5 text-xs font-bold text-brand-primary hover:text-brand-secondary transition-colors"
+                    >
+                        <ListBulletIcon className="w-3.5 h-3.5" />
+                        {isSummarizing ? 'Summarizing...' : 'AI Summary'}
+                    </button>
+                )}
+            </div>
+            <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100 mt-1">{title}</h2>
           </div>
           <div className="flex flex-col items-end gap-2">
             <StatusBadge status={status} />
@@ -308,9 +335,19 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
         </div>
 
         <div className="mt-8 space-y-8">
+          {summary && (
+             <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-xl">
+                <h3 className="text-xs font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                    <SparklesIcon className="w-3.5 h-3.5" />
+                    FixDesk AI Summary
+                </h3>
+                <p className="text-sm text-amber-900 dark:text-amber-200 italic leading-relaxed">{summary}</p>
+             </div>
+          )}
+
           <div>
-            <h3 className="text-lg font-semibold text-slate-700 mb-2">Problem Description</h3>
-            <p className="text-slate-600 leading-relaxed">{description}</p>
+            <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-2">Problem Description</h3>
+            <p className="text-slate-600 dark:text-slate-400 leading-relaxed">{description}</p>
           </div>
 
           {videoUrl && (

@@ -2,7 +2,8 @@ import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { Card } from './common/Card';
 import { mockAnalyticsData } from '../constants';
-import { Ticket, TicketStatus } from '../types';
+import { Ticket, TicketStatus, Activity } from '../types';
+import { ChatBubbleBottomCenterTextIcon } from './icons/Icons';
 
 const PIE_COLORS = { 'FixDesk AI': '#4F46E5', 'IT Support Team': '#A78BFA' };
 
@@ -16,9 +17,10 @@ const StatCard: React.FC<{ title: string; value: string | number; subtext: strin
 
 interface DashboardProps {
   tickets: Ticket[];
+  role?: 'staff' | 'admin';
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ tickets }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin' }) => {
   const analytics = mockAnalyticsData;
   
   const totalTickets = tickets.length;
@@ -62,6 +64,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets }) => {
     tickets: tickets.filter(t => t.createdAt.startsWith(date)).length
   }));
 
+  const allActivities = tickets
+    .flatMap(t => (t.activities || []).map(a => ({ ...a, ticketTitle: t.title, ticketId: t.id })))
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 5);
+
   return (
     <div className="space-y-8">
       <h2 className="text-3xl font-bold text-slate-800">Analytics & IT Insights</h2>
@@ -102,7 +109,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets }) => {
           </ResponsiveContainer>
         </Card>
         <Card className="lg:col-span-2">
-          <h3 className="text-lg font-semibold text-slate-700 mb-4">Resolution Source</h3>
+          <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-4">Resolution Source</h3>
            <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
@@ -135,6 +142,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets }) => {
             </PieChart>
           </ResponsiveContainer>
         </Card>
+
+        {role === 'admin' && allActivities.length > 0 && (
+            <Card className="lg:col-span-5">
+                <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-4">Recent System Activity</h3>
+                <div className="space-y-4">
+                    {allActivities.map((activity, idx) => (
+                        <div key={idx} className="flex items-start gap-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700/50">
+                            <div className={`p-2 rounded-full ${
+                                activity.type === 'status_change' ? 'bg-blue-100 text-blue-600' :
+                                activity.type === 'resolution' ? 'bg-green-100 text-green-600' :
+                                'bg-slate-200 text-slate-600'
+                            }`}>
+                                <ChatBubbleBottomCenterTextIcon className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                                    {activity.message}
+                                </p>
+                                <p className="text-xs text-slate-500 mt-0.5 truncate">
+                                    On <span className="font-semibold">{activity.ticketTitle}</span> ({activity.ticketId}) • {activity.user}
+                                </p>
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
+                                {new Date(activity.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </Card>
+        )}
       </div>
     </div>
   );
