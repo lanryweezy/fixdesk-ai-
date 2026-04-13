@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { Solution } from '../types';
 import { Card } from './common/Card';
 import { BrainCircuit, SpinnerIcon, XCircleIcon } from './icons/Icons';
@@ -103,10 +104,10 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ role = 'admin' }) 
                     <BrainCircuit className="w-6 h-6 text-brand-primary" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-bold text-slate-800 mb-2">{solution.problemDescription}</h3>
-                    <p className="text-slate-600 text-sm leading-relaxed mb-4">
-                      {solution.solutionDescription}
-                    </p>
+                    <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-2">{solution.problemDescription}</h3>
+                    <div className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-4 prose dark:prose-invert max-w-none prose-sm">
+                      <ReactMarkdown>{solution.solutionDescription}</ReactMarkdown>
+                    </div>
                     <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
                       <span className="text-xs font-medium text-slate-400">
                         {solution.actions.length} recorded actions

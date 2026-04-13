@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Ticket, TicketStatus } from '../types';
+import { Ticket, TicketStatus, AnalysisResult, ConversationResult } from '../types';
 import { ComputerDesktopIcon, BrainCircuit, CheckCircleIcon, XCircleIcon } from './icons/Icons';
 import { useToast } from '../services/ToastContext';
 

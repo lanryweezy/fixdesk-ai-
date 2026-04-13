@@ -57,3 +57,23 @@ export interface RemoteSession {
   answer?: string;
   updatedAt: string;
 }
+
+export interface AnalysisResult {
+  title: string;
+  description: string;
+  resolution: string | null;
+  status: TicketStatus;
+  priority: 'Low' | 'Medium' | 'High';
+  suggestedScript?: string[];
+}
+
+export type ConversationResult = {
+  type: 'analysis';
+  data: AnalysisResult;
+} | {
+  type: 'question';
+  question: string;
+} | {
+  type: 'error';
+  message: string;
+};

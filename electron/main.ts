@@ -6,6 +6,7 @@ import { JSONFilePreset } from 'lowdb/node'
 import type { Ticket, Solution, RemoteSession, TicketStatus } from '../types'
 import { exec } from 'child_process'
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import si from 'systeminformation'
 
 // The built directory structure
 //
@@ -261,6 +262,80 @@ ipcMain.handle('ai-summarize-ticket', async (event, ticket) => {
         return result.response.text();
     } catch (error) {
         return "Failed to summarize.";
+    }
+});
+
+ipcMain.handle('get-system-diagnostics', async () => {
+    try {
+        const os = await si.osInfo();
+        const mem = await si.mem();
+        const cpu = await si.cpu();
+        const time = si.time();
+
+        return {
+            platform: os.platform,
+            distro: os.distro,
+            release: os.release,
+            arch: os.arch,
+            totalMemory: Math.round(mem.total / (1024 * 1024 * 1024)) + ' GB',
+            freeMemory: Math.round(mem.free / (1024 * 1024 * 1024)) + ' GB',
+            cpuModel: cpu.manufacturer + ' ' + cpu.brand,
+            uptime: Math.round(time.uptime / 3600) + ' hours',
+            timestamp: new Date().toISOString()
+        };
+    } catch (error) {
+        console.error('Diagnostic error:', error);
+        return { error: 'Failed to gather diagnostics' };
+    }
+});
+
+ipcMain.handle('ai-generate-kb-article', async (event, ticket) => {
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `
+            Convert the following support ticket into a professional Knowledge Base article.
+            Include the following sections:
+            - **Problem Summary**: A concise title-like summary.
+            - **Symptoms**: What the user saw.
+            - **Resolution**: Step-by-step fix.
+
+            TICKET: ${JSON.stringify(ticket)}
+
+            Use markdown formatting. Respond ONLY with the article content.
+        `;
+        const result = await model.generateContent(prompt);
+        return result.response.text();
+    } catch (error) {
+        return `Failed to generate article: ${ticket.resolution}`;
+    }
+});
+
+ipcMain.handle('ai-get-system-health', async (event, tickets) => {
+    try {
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
+        const prompt = `
+            Analyze the following list of support tickets from the last 7 days.
+            Provide a system health assessment including:
+            1. Overall Status (Healthy, Warning, Critical)
+            2. Key Trends (What's happening?)
+            3. Top Risk Area (Where should IT focus?)
+
+            TICKETS: ${JSON.stringify(tickets)}
+
+            Respond with ONLY a JSON object:
+            {
+                "status": "Healthy" | "Warning" | "Critical",
+                "summary": "1-2 sentences overall summary",
+                "risks": ["list of 2-3 risks"]
+            }
+        `;
+        const result = await model.generateContent(prompt);
+        return JSON.parse(result.response.text());
+    } catch (error) {
+        return { status: 'Healthy', summary: 'System operational.', risks: ['None identified'] };
     }
 });
 

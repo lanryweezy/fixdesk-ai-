@@ -17,10 +17,13 @@ export interface ElectronApi {
     deleteRemoteSession: (ticketId: string) => Promise<void>;
     getSettings: () => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean }>;
     updateSettings: (settings: Partial<{ role: 'staff' | 'admin', isDarkMode: boolean }>) => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean }>;
+    getSystemDiagnostics: () => Promise<any>;
     categorizeAndPrioritize: (title: string, description: string) => Promise<{ priority: 'Low' | 'Medium' | 'High', category: string }>;
     askAboutTicket: (ticket: Ticket, question: string) => Promise<string>;
     draftAiResponse: (ticket: Ticket) => Promise<string>;
     summarizeTicket: (ticket: Ticket) => Promise<string>;
+    generateKbArticle: (ticket: Ticket) => Promise<string>;
+    getSystemHealth: (tickets: Ticket[]) => Promise<{ status: string, summary: string, risks: string[] }>;
     startConversation: (videoBase64: string, prompt: string) => Promise<any>;
 }
 

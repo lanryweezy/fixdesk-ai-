@@ -44,6 +44,12 @@ export default function App() {
     // AI Auto-categorization
     const aiInsight = await window.electronAPI.categorizeAndPrioritize(newTicket.title, newTicket.description);
 
+    // Diagnostic collection
+    const diagnostics = await window.electronAPI.getSystemDiagnostics();
+    const diagnosticLog = diagnostics.error
+        ? 'Failed to gather system diagnostics.'
+        : `System Diagnostics: ${diagnostics.distro} (${diagnostics.release}), ${diagnostics.cpuModel}, ${diagnostics.totalMemory} RAM, Uptime: ${diagnostics.uptime}`;
+
     const initialActivity: Activity = {
         id: Math.random().toString(36).substr(2, 9),
         timestamp: new Date().toISOString(),
@@ -59,7 +65,8 @@ export default function App() {
       id: `TICK-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
       createdAt: new Date().toISOString(),
       reportedBy: 'Alex Smith', // Mocked user
-      activities: [initialActivity]
+      activities: [initialActivity],
+      logs: [diagnosticLog]
     };
     const createdTicket = await window.electronAPI.createTicket(ticket);
     setTickets(prevTickets => [createdTicket, ...prevTickets]);

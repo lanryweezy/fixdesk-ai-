@@ -27,12 +27,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteRemoteSession: (ticketId: string) => ipcRenderer.invoke('db-delete-remote-session', ticketId),
   getSettings: () => ipcRenderer.invoke('db-get-settings'),
   updateSettings: (settings: any) => ipcRenderer.invoke('db-update-settings', settings),
+  getSystemDiagnostics: () => ipcRenderer.invoke('get-system-diagnostics'),
 
   // AI actions
   categorizeAndPrioritize: (title: string, description: string) => ipcRenderer.invoke('ai-categorize-prioritize', { title, description }),
   askAboutTicket: (ticket: any, question: string) => ipcRenderer.invoke('ai-ask-about-ticket', { ticket, question }),
   draftAiResponse: (ticket: any) => ipcRenderer.invoke('ai-draft-response', ticket),
   summarizeTicket: (ticket: any) => ipcRenderer.invoke('ai-summarize-ticket', ticket),
+  generateKbArticle: (ticket: any) => ipcRenderer.invoke('ai-generate-kb-article', ticket),
+  getSystemHealth: (tickets: any) => ipcRenderer.invoke('ai-get-system-health', tickets),
   startConversation: (videoBase64: string, prompt: string) => ipcRenderer.invoke('ai-start-conversation', { videoBase64, prompt }),
 
   // Remote control actions (send for one-way communication)

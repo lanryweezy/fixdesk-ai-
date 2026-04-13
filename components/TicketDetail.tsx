@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { Ticket, TicketStatus, Solution, Activity } from '../types';
 import { Card } from './common/Card';
 import { ArrowUturnLeftIcon, CogIcon, SpinnerIcon, BrainCircuit, PaperAirplaneIcon, ChatBubbleBottomCenterTextIcon, BookmarkIcon, SparklesIcon, ListBulletIcon } from './icons/Icons';
@@ -149,9 +150,11 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
     if (!ticket.resolution) return;
     setIsUpdatingStatus(true);
     try {
+        const aiArticle = await window.electronAPI.generateKbArticle(ticket);
+
         const solutionData = {
             problemDescription: ticket.title,
-            solutionDescription: ticket.resolution,
+            solutionDescription: aiArticle,
             actions: []
         };
         await window.electronAPI.createSolution(solutionData);
@@ -346,7 +349,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
 
           <div>
             <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-2">Problem Description</h3>
-            <p className="text-slate-600 dark:text-slate-400 leading-relaxed">{description}</p>
+            <div className="text-slate-600 dark:text-slate-400 leading-relaxed prose dark:prose-invert max-w-none prose-sm">
+                <ReactMarkdown>{description}</ReactMarkdown>
+            </div>
           </div>
 
           {videoUrl && (
@@ -373,8 +378,10 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
                     </button>
                 )}
               </div>
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <p className="text-green-800 leading-relaxed">{resolution}</p>
+              <div className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800/50 rounded-lg p-4">
+                <div className="text-green-800 dark:text-green-200 leading-relaxed prose dark:prose-invert max-w-none prose-sm">
+                    <ReactMarkdown>{resolution}</ReactMarkdown>
+                </div>
               </div>
             </div>
           )}
@@ -422,9 +429,9 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
                                         </div>
                                         <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
                                             <div>
-                                                <p className="text-sm text-gray-500">
-                                                    {activity.message} <span className="font-medium text-gray-900">by {activity.user}</span>
-                                                </p>
+                                                <div className="text-sm text-gray-500 dark:text-slate-400 prose dark:prose-invert max-w-none prose-xs">
+                                                    <ReactMarkdown>{`${activity.message} **by ${activity.user}**`}</ReactMarkdown>
+                                                </div>
                                             </div>
                                             <div className="whitespace-nowrap text-right text-sm text-gray-500">
                                                 <time dateTime={activity.timestamp}>{new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>

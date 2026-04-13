@@ -3,7 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Card } from './common/Card';
 import { mockAnalyticsData } from '../constants';
 import { Ticket, TicketStatus, Activity } from '../types';
-import { ChatBubbleBottomCenterTextIcon } from './icons/Icons';
+import { ChatBubbleBottomCenterTextIcon, BrainCircuit, ShieldCheckIcon, SpinnerIcon } from './icons/Icons';
 
 const PIE_COLORS = { 'FixDesk AI': '#4F46E5', 'IT Support Team': '#A78BFA' };
 
@@ -22,6 +22,24 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin' }) => {
   const analytics = mockAnalyticsData;
+  const [systemHealth, setSystemHealth] = React.useState<{ status: string, summary: string, risks: string[] } | null>(null);
+  const [isLoadingHealth, setIsLoadingHealth] = React.useState(false);
+
+  React.useEffect(() => {
+    const fetchHealth = async () => {
+        if (role !== 'admin' || tickets.length === 0) return;
+        setIsLoadingHealth(true);
+        try {
+            const result = await window.electronAPI.getSystemHealth(tickets);
+            setSystemHealth(result);
+        } catch (error) {
+            console.error('Error fetching health:', error);
+        } finally {
+            setIsLoadingHealth(false);
+        }
+    };
+    fetchHealth();
+  }, [tickets, role]);
   
   const stats = useMemo(() => {
     const total = tickets.length;
@@ -76,6 +94,54 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin' })
   return (
     <div className="space-y-8">
       <h2 className="text-3xl font-bold text-slate-800">Analytics & IT Insights</h2>
+
+      {role === 'admin' && (
+        <Card className="p-0 overflow-hidden mb-8">
+            <div className="flex flex-col md:flex-row">
+                <div className={`p-6 md:w-64 flex flex-col items-center justify-center text-center ${
+                    systemHealth?.status === 'Critical' ? 'bg-red-500 text-white' :
+                    systemHealth?.status === 'Warning' ? 'bg-amber-500 text-white' :
+                    'bg-green-500 text-white'
+                }`}>
+                    {isLoadingHealth ? (
+                        <SpinnerIcon className="w-10 h-10 animate-spin" />
+                    ) : (
+                        <>
+                            <ShieldCheckIcon className="w-10 h-10 mb-2" />
+                            <h3 className="text-xl font-bold uppercase tracking-tight">{systemHealth?.status || 'Healthy'}</h3>
+                            <p className="text-[10px] opacity-80 mt-1 font-bold">System Health</p>
+                        </>
+                    )}
+                </div>
+                <div className="p-6 flex-1 bg-white dark:bg-slate-800">
+                    <div className="flex items-center gap-2 mb-3">
+                        <BrainCircuit className="w-5 h-5 text-brand-primary" />
+                        <h4 className="font-bold text-slate-800 dark:text-slate-100">AI Weekly Assessment</h4>
+                    </div>
+                    {isLoadingHealth ? (
+                        <div className="space-y-2">
+                            <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded w-3/4 animate-pulse"></div>
+                            <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded w-1/2 animate-pulse"></div>
+                        </div>
+                    ) : (
+                        <>
+                            <p className="text-sm text-slate-600 dark:text-slate-300 italic mb-4">
+                                "{systemHealth?.summary || 'FixDesk AI is analyzing ticket trends to identify potential system risks.'}"
+                            </p>
+                            <div className="flex flex-wrap gap-4">
+                                {(systemHealth?.risks || []).map((risk, i) => (
+                                    <div key={i} className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-brand-primary"></div>
+                                        {risk}
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard title="Total Tickets" value={stats.total} subtext="All-time ticket count" />
