@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
+import Fuse from 'fuse.js';
 import { Solution } from '../types';
 import { Card } from './common/Card';
 import { BrainCircuit, SpinnerIcon, XCircleIcon } from './icons/Icons';
@@ -14,6 +15,16 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ role = 'admin' }) 
   const [solutions, setSolutions] = useState<Solution[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+
+  const fuse = useMemo(() => new Fuse(solutions, {
+    keys: ['problemDescription', 'solutionDescription', 'id'],
+    threshold: 0.3
+  }), [solutions]);
+
+  const filteredSolutions = useMemo(() => {
+    if (!searchTerm.trim()) return solutions;
+    return fuse.search(searchTerm).map(r => r.item);
+  }, [solutions, searchTerm, fuse]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newProblem, setNewProblem] = useState('');
   const [newSolution, setNewSolution] = useState('');
@@ -33,11 +44,6 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ role = 'admin' }) 
     };
     fetchSolutions();
   }, []);
-
-  const filteredSolutions = solutions.filter(s =>
-    s.problemDescription.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.solutionDescription.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   const handleAddSolution = async () => {
     if (!newProblem.trim() || !newSolution.trim()) return;

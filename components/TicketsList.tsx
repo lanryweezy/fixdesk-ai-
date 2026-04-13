@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import Fuse from 'fuse.js';
 import { Ticket, TicketStatus } from '../types';
 import { Card } from './common/Card';
 import { CogIcon } from './icons/Icons';
@@ -73,19 +74,38 @@ export const TicketsList: React.FC<TicketsListProps> = ({ tickets, onSelectTicke
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<TicketStatus | 'All'>('All');
   const [priorityFilter, setPriorityFilter] = useState<'Low' | 'Medium' | 'High' | 'All'>('All');
+  const [sortBy, setSortBy] = useState<'Newest' | 'Oldest' | 'Priority'>('Newest');
   const [selectedTicketIds, setSelectedTicketIds] = useState<Set<string>>(new Set());
 
-  const filteredTickets = tickets.filter(ticket => {
-    // Role-based visibility: Staff only see their own tickets
-    const matchesRole = role === 'admin' || ticket.reportedBy === 'Alex Smith'; // Mocked current user
+  const fuse = useMemo(() => new Fuse(tickets, {
+    keys: ['title', 'description', 'id', 'reportedBy'],
+    threshold: 0.3
+  }), [tickets]);
 
-    const matchesSearch = ticket.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          ticket.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          ticket.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'All' || ticket.status === statusFilter;
-    const matchesPriority = priorityFilter === 'All' || ticket.priority === priorityFilter;
-    return matchesRole && matchesSearch && matchesStatus && matchesPriority;
-  });
+  const filteredTickets = useMemo(() => {
+    let result = tickets;
+
+    if (searchTerm.trim()) {
+        result = fuse.search(searchTerm).map(r => r.item);
+    }
+
+    const filtered = result.filter(ticket => {
+        // Role-based visibility: Staff only see their own tickets
+        const matchesRole = role === 'admin' || ticket.reportedBy === 'Alex Smith'; // Mocked current user
+        const matchesStatus = statusFilter === 'All' || ticket.status === statusFilter;
+        const matchesPriority = priorityFilter === 'All' || ticket.priority === priorityFilter;
+        return matchesRole && matchesStatus && matchesPriority;
+    });
+
+    const priorityMap = { 'High': 3, 'Medium': 2, 'Low': 1 };
+
+    return [...filtered].sort((a, b) => {
+        if (sortBy === 'Newest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        if (sortBy === 'Oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        if (sortBy === 'Priority') return (priorityMap[b.priority] || 0) - (priorityMap[a.priority] || 0);
+        return 0;
+    });
+  }, [tickets, searchTerm, statusFilter, priorityFilter, sortBy, role, fuse]);
 
   const toggleSelect = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -133,6 +153,15 @@ export const TicketsList: React.FC<TicketsListProps> = ({ tickets, onSelectTicke
                 <option value="Low">Low</option>
                 <option value="Medium">Medium</option>
                 <option value="High">High</option>
+            </select>
+            <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            >
+                <option value="Newest">Newest First</option>
+                <option value="Oldest">Oldest First</option>
+                <option value="Priority">Priority (High to Low)</option>
             </select>
         </div>
       </div>

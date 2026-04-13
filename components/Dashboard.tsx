@@ -48,7 +48,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin' })
     const humanCount = tickets.filter(t => t.status === TicketStatus.RESOLVED).length;
     const autoRate = resolved.length > 0 ? Math.round((aiCount / resolved.length) * 100) : 0;
 
-    return { total, resolvedCount: resolved.length, aiCount, humanCount, autoRate };
+    // Calculate average resolution time
+    let totalResTime = 0;
+    resolved.forEach(t => {
+        const resolutionActivity = (t.activities || []).find(a => a.type === 'resolution');
+        if (resolutionActivity) {
+            const start = new Date(t.createdAt).getTime();
+            const end = new Date(resolutionActivity.timestamp).getTime();
+            totalResTime += (end - start);
+        }
+    });
+    const avgResMs = resolved.length > 0 ? totalResTime / resolved.length : 0;
+    const avgResHours = Math.round((avgResMs / (1000 * 60 * 60)) * 10) / 10;
+
+    return { total, resolvedCount: resolved.length, aiCount, humanCount, autoRate, avgResHours };
   }, [tickets]);
 
   const resolutionByData = useMemo(() => [
@@ -147,7 +160,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin' })
         <StatCard title="Total Tickets" value={stats.total} subtext="All-time ticket count" />
         <StatCard title="Tickets Resolved" value={stats.resolvedCount} subtext="Total resolved tickets" />
         <StatCard title="Automation Rate" value={`${stats.autoRate}%`} subtext="Resolved by FixDesk AI" />
-        <StatCard title="Avg. Resolution Time" value={analytics.avgResolutionTime} subtext="For human-handled tickets" />
+        <StatCard title="Avg. Resolution Time" value={`${stats.avgResHours}h`} subtext="From creation to resolution" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">

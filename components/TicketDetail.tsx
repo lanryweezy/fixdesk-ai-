@@ -42,6 +42,13 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'ai', content: string }[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [isDrafting, setIsDrafting] = useState(false);
+  const chatContainerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (chatContainerRef.current) {
+        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [chatHistory, isTyping]);
   const [summary, setSummary] = useState<string | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
 
@@ -486,18 +493,23 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
                 <h3 className="text-xl font-bold text-slate-800">Ask FixDesk AI About This Ticket</h3>
             </div>
 
-            <div className="bg-slate-50 rounded-xl p-4 min-h-[100px] max-h-[300px] overflow-y-auto mb-4 border border-slate-200 space-y-3">
+            <div ref={chatContainerRef} className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 min-h-[150px] max-h-[350px] overflow-y-auto mb-4 border border-slate-200 dark:border-slate-800 space-y-4 scroll-smooth">
                 {chatHistory.length === 0 ? (
-                    <p className="text-slate-400 text-sm italic text-center py-8">No messages yet. Ask me anything about this ticket's status, logs, or potential fixes.</p>
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                        <BrainCircuit className="w-8 h-8 text-slate-300 dark:text-slate-700 mb-3" />
+                        <p className="text-slate-400 dark:text-slate-600 text-sm italic">Ask me anything about this ticket's status,<br/>logs, or potential fixes.</p>
+                    </div>
                 ) : (
                     chatHistory.map((msg, i) => (
-                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm ${
+                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+                            <div className={`max-w-[85%] px-4 py-2.5 rounded-2xl shadow-sm ${
                                 msg.role === 'user'
                                 ? 'bg-brand-primary text-white rounded-br-none'
-                                : 'bg-white text-slate-700 border border-slate-200 rounded-bl-none shadow-sm'
+                                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-bl-none'
                             }`}>
-                                {msg.content}
+                                <div className="prose prose-sm dark:prose-invert max-w-none">
+                                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                </div>
                             </div>
                         </div>
                     ))
@@ -528,9 +540,15 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
                 <textarea
                     value={chatMessage}
                     onChange={(e) => setChatMessage(e.target.value)}
-                    placeholder={role === 'admin' ? "Draft your response..." : "Ask a question..."}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendMessage();
+                        }
+                    }}
+                    placeholder={role === 'admin' ? "Type a response or use AI suggestions..." : "Ask a question about this ticket..."}
                     rows={chatMessage.length > 50 ? 3 : 1}
-                    className="w-full pl-4 pr-12 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent transition-all shadow-sm resize-none"
+                    className="w-full pl-4 pr-12 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent transition-all shadow-sm resize-none"
                 />
                 <button
                     type="submit"
