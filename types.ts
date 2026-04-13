@@ -28,6 +28,7 @@ export interface Ticket {
   logs?: string[];
   priority: 'Low' | 'Medium' | 'High';
   activities?: Activity[];
+  attachments?: { name: string; url: string }[];
 }
 
 export interface RecordedAction {

@@ -11,6 +11,7 @@ interface SidebarProps {
   role: 'staff' | 'admin';
   onRoleToggle: () => void;
   tickets: Ticket[];
+  userName: string;
 }
 
 const navItems = [
@@ -25,9 +26,9 @@ const adminNavItems = [
     { name: 'Remote Control', icon: ShieldCheckIcon, page: 'remote', roles: ['admin'] },
 ]
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReportIssue, role, onRoleToggle, tickets }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReportIssue, role, onRoleToggle, tickets, userName }) => {
   const unassignedCount = tickets.filter(t => !t.assignedTo && t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.AI_RESOLVED).length;
-  const staffActiveCount = tickets.filter(t => t.reportedBy === 'Alex Smith' && t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.AI_RESOLVED).length;
+  const staffActiveCount = tickets.filter(t => t.reportedBy === userName && t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.AI_RESOLVED).length;
 
   return (
     <div className="w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col p-4">

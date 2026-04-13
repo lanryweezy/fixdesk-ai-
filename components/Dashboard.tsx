@@ -24,6 +24,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin' })
   const analytics = mockAnalyticsData;
   const [systemHealth, setSystemHealth] = React.useState<{ status: string, summary: string, risks: string[] } | null>(null);
   const [isLoadingHealth, setIsLoadingHealth] = React.useState(false);
+  const [dateRange, setDateRange] = React.useState<'24h' | '7d' | '30d'>('7d');
 
   React.useEffect(() => {
     const fetchHealth = async () => {
@@ -41,9 +42,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin' })
     fetchHealth();
   }, [tickets, role]);
   
+  const filteredTickets = useMemo(() => {
+    const now = new Date().getTime();
+    const ranges = {
+        '24h': 24 * 60 * 60 * 1000,
+        '7d': 7 * 24 * 60 * 60 * 1000,
+        '30d': 30 * 24 * 60 * 60 * 1000
+    };
+    return tickets.filter(t => (now - new Date(t.createdAt).getTime()) <= ranges[dateRange]);
+  }, [tickets, dateRange]);
+
   const stats = useMemo(() => {
-    const total = tickets.length;
-    const resolved = tickets.filter(t => t.status === TicketStatus.RESOLVED || t.status === TicketStatus.AI_RESOLVED);
+    const total = filteredTickets.length;
+    const resolved = filteredTickets.filter(t => t.status === TicketStatus.RESOLVED || t.status === TicketStatus.AI_RESOLVED);
     const aiCount = tickets.filter(t => t.status === TicketStatus.AI_RESOLVED).length;
     const humanCount = tickets.filter(t => t.status === TicketStatus.RESOLVED).length;
     const autoRate = resolved.length > 0 ? Math.round((aiCount / resolved.length) * 100) : 0;
@@ -71,7 +82,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin' })
 
   const displayIssues = useMemo(() => {
     const issueCounts: Record<string, number> = {};
-    tickets.forEach(ticket => {
+    filteredTickets.forEach(ticket => {
         const category = ticket.title.split(':')[0] || 'Uncategorized';
         issueCounts[category] = (issueCounts[category] || 0) + 1;
     });
@@ -82,20 +93,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin' })
         .slice(0, 5);
 
     return dynamic.length > 0 ? dynamic : analytics.commonIssues;
-  }, [tickets, analytics.commonIssues]);
+  }, [filteredTickets, analytics.commonIssues]);
 
   const ticketsOverTime = useMemo(() => {
-    const last7Days = [...Array(7)].map((_, i) => {
+    const dayCount = dateRange === '24h' ? 24 : dateRange === '7d' ? 7 : 30;
+    const timePoints = [...Array(dayCount)].map((_, i) => {
         const d = new Date();
-        d.setDate(d.getDate() - i);
-        return d.toISOString().split('T')[0];
+        if (dateRange === '24h') d.setHours(d.getHours() - i);
+        else d.setDate(d.getDate() - i);
+        return d;
     }).reverse();
 
-    return last7Days.map(date => ({
-        date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        tickets: tickets.filter(t => t.createdAt.startsWith(date)).length
-    }));
-  }, [tickets]);
+    return timePoints.map(d => {
+        const label = dateRange === '24h'
+            ? d.getHours() + ':00'
+            : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+        const count = tickets.filter(t => {
+            const tDate = new Date(t.createdAt);
+            if (dateRange === '24h') return tDate.getDate() === d.getDate() && tDate.getHours() === d.getHours();
+            return tDate.toDateString() === d.toDateString();
+        }).length;
+
+        return { date: label, tickets: count };
+    });
+  }, [tickets, dateRange]);
 
   const allActivities = useMemo(() => {
     return tickets
@@ -106,7 +128,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin' })
 
   return (
     <div className="space-y-8">
-      <h2 className="text-3xl font-bold text-slate-800">Analytics & IT Insights</h2>
+      <div className="flex justify-between items-center">
+        <h2 className="text-3xl font-bold text-slate-800">Analytics & IT Insights</h2>
+        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+            {(['24h', '7d', '30d'] as const).map(range => (
+                <button
+                    key={range}
+                    onClick={() => setDateRange(range)}
+                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
+                        dateRange === range
+                        ? 'bg-white dark:bg-slate-700 text-brand-primary shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                    }`}
+                >
+                    {range.toUpperCase()}
+                </button>
+            ))}
+        </div>
+      </div>
 
       {role === 'admin' && (
         <Card className="p-0 overflow-hidden mb-8">

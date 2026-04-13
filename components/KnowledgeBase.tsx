@@ -8,9 +8,10 @@ import { useToast } from '../services/ToastContext';
 
 interface KnowledgeBaseProps {
     role?: 'staff' | 'admin';
+    onSelectSolution: (solution: Solution) => void;
 }
 
-export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ role = 'admin' }) => {
+export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ role = 'admin', onSelectSolution }) => {
   const { addToast } = useToast();
   const [solutions, setSolutions] = useState<Solution[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -104,7 +105,11 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ role = 'admin' }) 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredSolutions.length > 0 ? (
             filteredSolutions.map((solution) => (
-              <Card key={solution.id} className="p-6 hover:shadow-md transition-shadow">
+              <Card
+                key={solution.id}
+                className="p-6 hover:shadow-md transition-shadow cursor-pointer border hover:border-brand-primary/50"
+                onClick={() => onSelectSolution(solution)}
+              >
                 <div className="flex items-start gap-4">
                   <div className="p-2 bg-brand-primary/10 rounded-lg">
                     <BrainCircuit className="w-6 h-6 text-brand-primary" />

@@ -34,6 +34,8 @@ type Data = {
   settings: {
     role: 'staff' | 'admin';
     isDarkMode: boolean;
+    userName: string;
+    userAvatar: string;
   }
 }
 let db: Low<Data>;
@@ -42,7 +44,12 @@ const initDatabase = async () => {
         tickets: [],
         solutions: [],
         remoteSessions: [],
-        settings: { role: 'admin', isDarkMode: false }
+        settings: {
+            role: 'admin',
+            isDarkMode: false,
+            userName: 'Alex Smith',
+            userAvatar: 'AS'
+        }
     };
     const dbPath = path.join(app.getPath('userData'), 'db.json');
     db = await JSONFilePreset<Data>(dbPath, defaultData);

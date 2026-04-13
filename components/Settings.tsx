@@ -7,9 +7,12 @@ interface SettingsProps {
   onRoleToggle: () => void;
   isDarkMode: boolean;
   onDarkModeToggle: () => void;
+  userName: string;
+  onUpdateProfile: (name: string) => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle, isDarkMode, onDarkModeToggle }) => {
+export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle, isDarkMode, onDarkModeToggle, userName, onUpdateProfile }) => {
+    const [editName, setEditName] = React.useState(userName);
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
@@ -23,7 +26,26 @@ export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle, isDarkMo
             <h3 className="font-bold text-slate-800">User Profile</h3>
         </div>
         <div className="p-6 space-y-6">
-            <div className="flex items-center justify-between">
+            <div>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">Display Name</label>
+                <div className="flex gap-3">
+                    <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="flex-1 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-brand-primary outline-none transition-all"
+                    />
+                    <button
+                        onClick={() => onUpdateProfile(editName)}
+                        disabled={editName === userName || !editName.trim()}
+                        className="px-4 py-2 bg-brand-primary text-white rounded-lg text-sm font-bold hover:bg-brand-primary/90 transition-all disabled:bg-slate-300 disabled:cursor-not-allowed"
+                    >
+                        Save
+                    </button>
+                </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
                 <div>
                     <p className="font-semibold text-slate-700 dark:text-slate-200">Persona Selection</p>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Choose your role to switch between Staff and IT Admin views.</p>

@@ -65,7 +65,12 @@ const initDatabase = async () => {
         tickets: [],
         solutions: [],
         remoteSessions: [],
-        settings: { role: 'admin', isDarkMode: false }
+        settings: {
+            role: 'admin',
+            isDarkMode: false,
+            userName: 'Alex Smith',
+            userAvatar: 'AS'
+        }
     };
     const dbPath = path.join(electron_1.app.getPath('userData'), 'db.json');
     db = await (0, node_1.JSONFilePreset)(dbPath, defaultData);

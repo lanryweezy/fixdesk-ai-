@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Ticket, TicketStatus, AnalysisResult, ConversationResult } from '../types';
-import { ComputerDesktopIcon, BrainCircuit, CheckCircleIcon, XCircleIcon } from './icons/Icons';
+import { ComputerDesktopIcon, BrainCircuit, CheckCircleIcon, XCircleIcon, PaperClipIcon } from './icons/Icons';
 import { useToast } from '../services/ToastContext';
 
 
@@ -15,6 +15,7 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
   const { addToast } = useToast();
   const [step, setStep] = useState<ModalStep>('initial');
   const [prompt, setPrompt] = useState('');
+  const [attachments, setAttachments] = useState<{ name: string; url: string }[]>([]);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [clarificationQuestion, setClarificationQuestion] = useState('');
@@ -138,7 +139,8 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
         status: TicketStatus.AI_RESOLVED,
         priority: analysisResult.priority,
         resolution: analysisResult.resolution || 'User confirmed the AI-suggested fix was successful.',
-        videoUrl: 'https://mock.url/video.mp4'
+        videoUrl: 'https://mock.url/video.mp4',
+        attachments
       });
     }
   };
@@ -150,7 +152,8 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
         description: analysisResult.description,
         status: TicketStatus.NEW,
         priority: analysisResult.priority,
-        videoUrl: 'https://mock.url/video.mp4'
+        videoUrl: 'https://mock.url/video.mp4',
+        attachments
       });
     }
   };
@@ -207,6 +210,29 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
                 className="w-full rounded-md border-gray-300 shadow-sm focus:border-brand-primary focus:ring-brand-primary sm:text-sm"
                 placeholder="e.g., My VPN keeps disconnecting..."
               />
+            </div>
+
+            <div className="mt-4">
+                <label className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                    <PaperClipIcon className="w-4 h-4" />
+                    Attachments (Optional)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                    {attachments.map((file, i) => (
+                        <div key={i} className="flex items-center gap-2 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs font-medium text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                            {file.name}
+                            <button onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-red-500">
+                                <XCircleIcon className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    ))}
+                    <button
+                        onClick={() => setAttachments(prev => [...prev, { name: `attachment-${prev.length + 1}.png`, url: '#' }])}
+                        className="px-3 py-1 border border-dashed border-slate-300 dark:border-slate-700 rounded text-xs font-medium text-slate-500 hover:border-brand-primary hover:text-brand-primary transition-all"
+                    >
+                        + Add File
+                    </button>
+                </div>
             </div>
             <div className="mt-5 sm:mt-6">
               <button

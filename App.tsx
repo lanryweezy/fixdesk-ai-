@@ -1,5 +1,6 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
@@ -10,19 +11,23 @@ import { Settings } from './components/Settings';
 import { ReportIssueModal } from './components/ReportIssueModal';
 import { RemoteControlView } from './components/RemoteControlView';
 import { StartRemoteSession } from './components/StartRemoteSession';
-import { Ticket, Activity } from './types';
-import { BrainCircuit } from './components/icons/Icons';
+import { Card } from './components/common/Card';
+import { Ticket, Activity, Solution } from './types';
+import { BrainCircuit, ArrowUturnLeftIcon } from './components/icons/Icons';
 
-export type Page = 'dashboard' | 'tickets' | 'remote' | 'start-remote-session' | 'knowledge-base' | 'settings';
+export type Page = 'dashboard' | 'tickets' | 'remote' | 'start-remote-session' | 'knowledge-base' | 'settings' | 'kb-article';
 
 export default function App() {
   const [page, setPage] = useState<Page>('dashboard');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [selectedSolution, setSelectedSolution] = useState<Solution | null>(null);
   const [remoteTicketId, setRemoteTicketId] = useState<string | null>(null);
   const [role, setRole] = useState<'staff' | 'admin'>('admin');
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [userName, setUserName] = useState('Alex Smith');
+  const [userAvatar, setUserAvatar] = useState('AS');
 
   useEffect(() => {
     const initApp = async () => {
@@ -35,6 +40,8 @@ export default function App() {
         if (storedSettings) {
             setRole(storedSettings.role);
             setIsDarkMode(storedSettings.isDarkMode);
+            if (storedSettings.userName) setUserName(storedSettings.userName);
+            if (storedSettings.userAvatar) setUserAvatar(storedSettings.userAvatar);
         }
     };
     initApp();
@@ -64,7 +71,7 @@ export default function App() {
       title: `${aiInsight.category}: ${newTicket.title}`,
       id: `TICK-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
       createdAt: new Date().toISOString(),
-      reportedBy: 'Alex Smith', // Mocked user
+      reportedBy: userName,
       activities: [initialActivity],
       logs: [diagnosticLog]
     };
@@ -86,6 +93,8 @@ export default function App() {
 
   const handleBackToList = useCallback(async () => {
     setSelectedTicket(null);
+    setSelectedSolution(null);
+    setPage(prev => (prev === 'kb-article' ? 'knowledge-base' : prev));
     refreshTickets();
   }, [refreshTickets]);
   
@@ -111,7 +120,38 @@ export default function App() {
     await window.electronAPI.updateSettings({ isDarkMode: newMode });
   }, [isDarkMode]);
 
+  const handleUpdateProfile = useCallback(async (name: string) => {
+    const avatar = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    setUserName(name);
+    setUserAvatar(avatar);
+    await window.electronAPI.updateSettings({ userName: name, userAvatar: avatar });
+  }, []);
+
+  const handleSelectSolution = useCallback((solution: Solution) => {
+    setSelectedSolution(solution);
+    setPage('kb-article');
+  }, []);
+
   const renderPage = () => {
+    if (page === 'kb-article' && selectedSolution) {
+        return (
+            <div className="max-w-4xl mx-auto">
+                <button onClick={handleBackToList} className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-brand-primary mb-6 transition-colors">
+                    <ArrowUturnLeftIcon className="w-5 h-5" />
+                    Back to Knowledge Base
+                </button>
+                <Card className="p-8">
+                    <div className="flex items-center gap-3 mb-6">
+                        <BrainCircuit className="w-8 h-8 text-brand-primary" />
+                        <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100">{selectedSolution.problemDescription}</h2>
+                    </div>
+                    <div className="prose dark:prose-invert max-w-none prose-indigo">
+                        <ReactMarkdown>{selectedSolution.solutionDescription}</ReactMarkdown>
+                    </div>
+                </Card>
+            </div>
+        );
+    }
     if (page === 'tickets' && selectedTicket) {
       return <TicketDetail
         ticket={selectedTicket}
@@ -127,7 +167,7 @@ export default function App() {
       case 'tickets':
         return <TicketsList tickets={tickets} onSelectTicket={handleSelectTicket} role={role} onRefresh={refreshTickets} />;
       case 'knowledge-base':
-        return <KnowledgeBase role={role} />;
+        return <KnowledgeBase role={role} onSelectSolution={handleSelectSolution} />;
       case 'settings':
         return (
             <Settings
@@ -135,6 +175,8 @@ export default function App() {
                 onRoleToggle={handleRoleToggle}
                 isDarkMode={isDarkMode}
                 onDarkModeToggle={handleDarkModeToggle}
+                userName={userName}
+                onUpdateProfile={handleUpdateProfile}
             />
         );
       case 'remote':
@@ -155,9 +197,10 @@ export default function App() {
         role={role}
         onRoleToggle={handleRoleToggle}
         tickets={tickets}
+        userName={userName}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header role={role} />
+        <Header role={role} userName={userName} userAvatar={userAvatar} />
         <main className="flex-1 overflow-y-auto p-8">
           {renderPage()}
         </main>
