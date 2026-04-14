@@ -10,7 +10,7 @@ const PIE_COLORS = { 'FixDesk AI': '#4F46E5', 'IT Support Team': '#A78BFA' };
 const StatCard: React.FC<{ title: string; value: string | number; subtext: string }> = ({ title, value, subtext }) => (
   <Card>
     <h3 className="text-sm font-medium text-slate-500">{title}</h3>
-    <p className="text-3xl font-bold text-slate-800 mt-2">{value}</p>
+    <p className="text-3xl font-bold text-slate-800 dark:text-slate-100 mt-2">{value}</p>
     <p className="text-sm text-slate-400 mt-1">{subtext}</p>
   </Card>
 );
@@ -18,13 +18,29 @@ const StatCard: React.FC<{ title: string; value: string | number; subtext: strin
 interface DashboardProps {
   tickets: Ticket[];
   role?: 'staff' | 'admin';
+  onFilterTickets?: (category: string) => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin' }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', onFilterTickets }) => {
   const analytics = mockAnalyticsData;
   const [systemHealth, setSystemHealth] = React.useState<{ status: string, summary: string, risks: string[] } | null>(null);
   const [isLoadingHealth, setIsLoadingHealth] = React.useState(false);
   const [dateRange, setDateRange] = React.useState<'24h' | '7d' | '30d'>('7d');
+  const [liveMetrics, setLiveMetrics] = React.useState({ cpuUsage: 0, memUsage: 0, diskUsage: 0 });
+
+  React.useEffect(() => {
+    const fetchMetrics = async () => {
+        try {
+            const metrics = await window.electronAPI.getSystemMetrics();
+            setLiveMetrics(metrics);
+        } catch (e) {
+            console.error("Failed to fetch metrics", e);
+        }
+    };
+    fetchMetrics();
+    const interval = setInterval(fetchMetrics, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   React.useEffect(() => {
     const fetchHealth = async () => {
@@ -128,9 +144,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin' })
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <h2 className="text-3xl font-bold text-slate-800">Analytics & IT Insights</h2>
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+      <div className="flex justify-between items-start">
+        <div className="space-y-1">
+            <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Analytics & IT Insights</h2>
+            <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-wider">
+                <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-brand-primary animate-pulse"></div>
+                    <span className="text-slate-400">Live CPU:</span>
+                    <span className="text-slate-600 dark:text-slate-200">{liveMetrics.cpuUsage}%</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></div>
+                    <span className="text-slate-400">Memory:</span>
+                    <span className="text-slate-600 dark:text-slate-200">{liveMetrics.memUsage}%</span>
+                </div>
+            </div>
+        </div>
+        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 h-fit">
             {(['24h', '7d', '30d'] as const).map(range => (
                 <button
                     key={range}
@@ -204,7 +234,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin' })
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <Card className="lg:col-span-5">
-            <h3 className="text-lg font-semibold text-slate-700 mb-4">Tickets Created (Last 7 Days)</h3>
+            <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-4">Tickets Created (Last 7 Days)</h3>
             <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={ticketsOverTime}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -219,14 +249,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin' })
         </Card>
 
         <Card className="lg:col-span-3">
-          <h3 className="text-lg font-semibold text-slate-700 mb-4">Most Common Issues</h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200">Most Common Issues</h3>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Click bar to filter</span>
+          </div>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={displayIssues} layout="vertical" margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+            <BarChart
+                data={displayIssues}
+                layout="vertical"
+                margin={{ top: 5, right: 20, left: 20, bottom: 5 }}
+                onClick={(data) => {
+                    if (data && data.activeLabel && onFilterTickets) {
+                        onFilterTickets(data.activeLabel);
+                    }
+                }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
               <XAxis type="number" stroke="#94a3b8" />
-              <YAxis dataKey="name" type="category" width={110} stroke="#94a3b8" />
+              <YAxis dataKey="name" type="category" width={110} stroke="#94a3b8" cursor="pointer" />
               <Tooltip cursor={{fill: '#f1f5f9'}} contentStyle={{backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '0.5rem'}} />
-              <Bar dataKey="value" name="Tickets" fill="#4F46E5" radius={[0, 4, 4, 0]} />
+              <Bar dataKey="value" name="Tickets" fill="#4F46E5" radius={[0, 4, 4, 0]} className="cursor-pointer" />
             </BarChart>
           </ResponsiveContainer>
         </Card>

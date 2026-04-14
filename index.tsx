@@ -3,12 +3,12 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { ToastProvider } from './services/ToastContext';
+import { Buffer } from 'buffer';
 
-// simple-peer depends on Buffer, providing a minimal shim for the browser environment
-if (typeof window !== 'undefined' && !window.Buffer) {
-  (window as any).Buffer = {
-    isBuffer: () => false,
-  };
+// simple-peer depends on Buffer and global
+if (typeof window !== 'undefined') {
+  window.Buffer = window.Buffer || Buffer;
+  (window as any).global = window;
 }
 
 const rootElement = document.getElementById('root');

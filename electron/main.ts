@@ -288,13 +288,20 @@ const ALLOWED_COMMANDS = ['ping', 'ifconfig', 'ipconfig', 'netstat', 'ls', 'dir'
 
 ipcMain.handle('execute-command', async (event, commands: string[]) => {
   const isAllowed = (cmd: string) => {
+    // 1. Check for command chaining characters
+    const forbiddenChars = [';', '&', '|', '>', '<', '`', '$', '(', ')'];
+    if (forbiddenChars.some(char => cmd.includes(char))) {
+        return false;
+    }
+
+    // 2. Check the base command against the whitelist
     const baseCmd = cmd.trim().split(' ')[0].toLowerCase();
     return ALLOWED_COMMANDS.includes(baseCmd);
   };
 
   const execPromise = (command: string) => {
     if (!isAllowed(command)) {
-        return Promise.resolve({ stdout: '', stderr: `Blocked: Command '${command}' is not in the whitelist.` });
+        return Promise.resolve({ stdout: '', stderr: `Blocked: Command '${command}' contains forbidden characters or is not in the whitelist.` });
     }
     return new Promise<{ stdout: string; stderr: string }>((resolve) => {
       exec(command, (error, stdout, stderr) => {
@@ -571,24 +578,53 @@ ipcMain.handle('ai-get-system-health', async (event, tickets) => {
 
 ipcMain.handle('ai-start-conversation', async (event, { videoBase64, prompt }) => {
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        // Minimal implementation for now to fix the dependency issue
-        const result = await model.generateContent([
-            { text: `Analyze this IT issue: ${prompt}` },
-            { inlineData: { mimeType: "video/webm", data: videoBase64 } }
-        ]);
-        // Mocking a structured response for now
-        return {
-            type: 'analysis',
-            data: {
-                title: prompt,
-                description: result.response.text(),
-                status: 'New',
-                priority: 'Medium'
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const systemPrompt = `
+            You are an expert IT Support Engineer. Analyze the provided video of a user issue and their description.
+            Determine if you have enough information to resolve it.
+
+            If YES (Resolution found):
+            Respond with:
+            {
+                "type": "analysis",
+                "data": {
+                    "title": "Short descriptive title",
+                    "description": "Clear explanation of the problem",
+                    "resolution": "Step-by-step resolution steps",
+                    "status": "Resolved",
+                    "priority": "Low" | "Medium" | "High",
+                    "suggestedScript": ["ls", "df"] // Optional shell commands from whitelist
+                }
             }
-        };
+
+            If NO (Need more info):
+            Respond with:
+            {
+                "type": "question",
+                "question": "The specific question you need to ask the user"
+            }
+        `;
+
+        const parts = [
+            { text: systemPrompt },
+            { text: `USER DESCRIPTION: ${prompt}` },
+        ];
+
+        if (videoBase64) {
+            parts.push({
+                inlineData: { mimeType: "video/webm", data: videoBase64 }
+            });
+        }
+
+        const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
+        return JSON.parse(result.response.text());
     } catch (error) {
-        return { type: 'error', message: 'AI Analysis failed.' };
+        console.error("AI Conversation Error:", error);
+        return { type: 'error', message: 'AI Analysis failed. Please try a manual description.' };
     }
 });
 // --- End Gemini AI Handlers ---
