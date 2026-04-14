@@ -6,6 +6,7 @@ import { TicketStatus, Ticket } from '../../types';
 const mockTickets: Ticket[] = [
   {
     id: 'T1',
+    workspaceId: 'DEFAULT',
     title: 'VPN issue',
     description: 'Cannot connect',
     status: TicketStatus.NEW,
@@ -15,6 +16,7 @@ const mockTickets: Ticket[] = [
   },
   {
     id: 'T2',
+    workspaceId: 'DEFAULT',
     title: 'Hardware fail',
     description: 'Screen broken',
     status: TicketStatus.IN_PROGRESS,

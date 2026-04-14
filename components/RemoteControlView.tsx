@@ -4,6 +4,7 @@ import Peer from 'simple-peer';
 import { RecordedAction, Solution } from '../types';
 import { SaveSolutionModal } from './SaveSolutionModal';
 import { useToast } from '../services/ToastContext';
+import { SpinnerIcon } from './icons/Icons';
 
 interface RemoteControlViewProps {
     ticketId?: string;
@@ -14,6 +15,8 @@ export const RemoteControlView: React.FC<RemoteControlViewProps> = ({ ticketId }
     const [offer, setOffer] = useState('');
     const [answer, setAnswer] = useState('');
     const [isPolling, setIsPolling] = useState(false);
+
+    const [isConnected, setIsConnected] = useState(false);
 
     useEffect(() => {
         if (ticketId && !isConnected && !offer) {
@@ -30,7 +33,6 @@ export const RemoteControlView: React.FC<RemoteControlViewProps> = ({ ticketId }
             return () => clearInterval(interval);
         }
     }, [ticketId, isConnected, offer]);
-    const [isConnected, setIsConnected] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [recordedActions, setRecordedActions] = useState<RecordedAction[]>([]);
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Peer from 'simple-peer';
 import { useToast } from '../services/ToastContext';
+import { SpinnerIcon } from './icons/Icons';
 
 interface StartRemoteSessionProps {
     ticketId?: string;
@@ -166,7 +167,7 @@ export const StartRemoteSession: React.FC<StartRemoteSessionProps> = ({ ticketId
                                 placeholder="Paste the answer from your admin here..."
                             />
                             <button
-                                onClick={handleConnect}
+                                onClick={() => handleConnect()}
                                 disabled={!answer}
                                 className="mt-2 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400"
                             >

@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import Fuse from 'fuse.js';
 import { Ticket, TicketStatus } from '../types';
 import { Card } from './common/Card';
-import { CogIcon } from './icons/Icons';
+import { CogIcon, CloudArrowDownIcon } from './icons/Icons';
 
 const StatusBadge: React.FC<{ status: TicketStatus }> = ({ status }) => {
   const baseClasses = 'px-2.5 py-0.5 text-xs font-semibold rounded-full inline-block';
@@ -13,6 +13,7 @@ const StatusBadge: React.FC<{ status: TicketStatus }> = ({ status }) => {
     [TicketStatus.RESOLVED]: 'bg-green-100 text-green-800',
     [TicketStatus.AI_RESOLVED]: 'bg-purple-100 text-purple-800',
     [TicketStatus.NEEDS_ATTENTION]: 'bg-red-100 text-red-800',
+    [TicketStatus.SELF_HEALED]: 'bg-indigo-100 text-indigo-800',
   };
   return <span className={`${baseClasses} ${statusClasses[status]}`}>{status}</span>;
 };
@@ -55,7 +56,7 @@ const TicketItem: React.FC<TicketItemProps> = ({ ticket, onSelect }) => {
             </div>
             <div className='flex items-center gap-4'>
                 <PriorityBadge priority={ticket.priority} />
-                {ticket.status === TicketStatus.AI_RESOLVED && <CogIcon className="w-5 h-5 text-purple-500" title="Resolved by AI" />}
+                {(ticket.status === TicketStatus.AI_RESOLVED || ticket.status === TicketStatus.SELF_HEALED) && <CogIcon className="w-5 h-5 text-purple-500" title="Resolved by AI" />}
             </div>
         </div>
     </div>
@@ -124,10 +125,45 @@ export const TicketsList: React.FC<TicketsListProps> = ({ tickets, onSelectTicke
     if (onRefresh) onRefresh();
   };
 
+  const handleExportCSV = () => {
+    const headers = ['ID', 'Title', 'Status', 'Priority', 'Reported By', 'Created At'];
+    const rows = filteredTickets.map(t => [
+        t.id,
+        t.title.replace(/,/g, ''), // Basic csv escaping
+        t.status,
+        t.priority,
+        t.reportedBy,
+        t.createdAt
+    ]);
+
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `fixdesk-tickets-export-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-6 relative pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <h2 className="text-3xl font-bold text-slate-800">My Tickets</h2>
+        <div className="flex items-center gap-4">
+            <h2 className="text-3xl font-bold text-slate-800">My Tickets</h2>
+            {role === 'admin' && filteredTickets.length > 0 && (
+                <button
+                    onClick={handleExportCSV}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 transition-all border border-slate-200 dark:border-slate-700"
+                    title="Export to CSV"
+                >
+                    <CloudArrowDownIcon className="w-4 h-4" />
+                    Export
+                </button>
+            )}
+        </div>
         <div className="flex flex-wrap gap-3 w-full md:w-auto">
             <input
                 type="text"

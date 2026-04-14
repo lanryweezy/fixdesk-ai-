@@ -21,9 +21,10 @@ const StatusBadge: React.FC<{ status: TicketStatus }> = ({ status }) => {
     [TicketStatus.RESOLVED]: 'bg-green-100 text-green-800',
     [TicketStatus.AI_RESOLVED]: 'bg-purple-100 text-purple-800',
     [TicketStatus.NEEDS_ATTENTION]: 'bg-red-100 text-red-800',
+    [TicketStatus.SELF_HEALED]: 'bg-indigo-100 text-indigo-800',
   };
   return <span className={`${baseClasses} ${statusClasses[status]}`}>
-    {status === TicketStatus.AI_RESOLVED && <CogIcon className="w-4 h-4" />}
+    {(status === TicketStatus.AI_RESOLVED || status === TicketStatus.SELF_HEALED) && <CogIcon className="w-4 h-4" />}
     {status}
   </span>;
 };

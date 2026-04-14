@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card } from './common/Card';
 import { Cog8ToothIcon, ShieldCheckIcon, UserIcon, BrainCircuit, SunIcon, MoonIcon } from './icons/Icons';
+import { useToast } from '../services/ToastContext';
 
 interface SettingsProps {
   role: 'staff' | 'admin';
@@ -9,10 +10,33 @@ interface SettingsProps {
   onDarkModeToggle: () => void;
   userName: string;
   onUpdateProfile: (name: string) => void;
+  activeWorkspaceId?: string;
+  onRefreshData?: () => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle, isDarkMode, onDarkModeToggle, userName, onUpdateProfile }) => {
+export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle, isDarkMode, onDarkModeToggle, userName, onUpdateProfile, activeWorkspaceId = 'DEFAULT', onRefreshData }) => {
     const [editName, setEditName] = React.useState(userName);
+    const { addToast } = useToast();
+    const [isGenerating, setIsGenerating] = React.useState(false);
+
+    const handleWorkspaceChange = async (id: string) => {
+        await window.electronAPI.updateSettings({ activeWorkspaceId: id });
+        if (onRefreshData) onRefreshData();
+        addToast(`Switched to workspace: ${id}`, 'success');
+    };
+
+    const handleGenerateMockData = async () => {
+        setIsGenerating(true);
+        try {
+            await window.electronAPI.generateMockData();
+            if (onRefreshData) onRefreshData();
+            addToast('Mock data generated successfully (50 tickets)', 'success');
+        } catch (error) {
+            addToast('Failed to generate mock data', 'error');
+        } finally {
+            setIsGenerating(false);
+        }
+    };
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
@@ -66,6 +90,23 @@ export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle, isDarkMo
 
             <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
                 <div>
+                    <p className="font-semibold text-slate-700 dark:text-slate-200">Active Workspace</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Isolate data between different companies or departments.</p>
+                </div>
+                <select
+                    value={activeWorkspaceId}
+                    onChange={(e) => handleWorkspaceChange(e.target.value)}
+                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-brand-primary outline-none"
+                >
+                    <option value="DEFAULT">Default Workspace</option>
+                    <option value="ACME_CORP">ACME Corp</option>
+                    <option value="GLOBEX">Globex Corporation</option>
+                    <option value="STARK_IND">Stark Industries</option>
+                </select>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
+                <div>
                     <p className="font-semibold text-slate-700 dark:text-slate-200">Appearance Mode</p>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Toggle between Light and Dark mode for the interface.</p>
                 </div>
@@ -104,9 +145,9 @@ export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle, isDarkMo
       </Card>
 
       <Card className="p-0 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 flex items-center gap-3">
             <BrainCircuit className="w-5 h-5 text-slate-500" />
-            <h3 className="font-bold text-slate-800">AI Configuration</h3>
+            <h3 className="font-bold text-slate-800 dark:text-slate-100">AI Configuration</h3>
         </div>
         <div className="p-6 space-y-6">
             <div>
@@ -125,14 +166,36 @@ export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle, isDarkMo
                 <p className="mt-2 text-xs text-slate-400">The API key is currently managed via environment variables for security.</p>
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
                 <div>
-                    <p className="font-semibold text-slate-700">Auto-Categorization</p>
-                    <p className="text-sm text-slate-500">Use AI to automatically categorize and prioritize incoming tickets.</p>
+                    <p className="font-semibold text-slate-700 dark:text-slate-200">Auto-Categorization</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Use AI to automatically categorize and prioritize incoming tickets.</p>
                 </div>
                 <div className="h-6 w-11 bg-brand-primary rounded-full flex items-center px-1">
                     <div className="h-4 w-4 bg-white rounded-full translate-x-5"></div>
                 </div>
+            </div>
+        </div>
+      </Card>
+
+      <Card className="p-0 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 flex items-center gap-3">
+            <Cog8ToothIcon className="w-5 h-5 text-slate-500" />
+            <h3 className="font-bold text-slate-800 dark:text-slate-100">Developer Tools</h3>
+        </div>
+        <div className="p-6 space-y-6">
+            <div className="flex items-center justify-between">
+                <div>
+                    <p className="font-semibold text-slate-700 dark:text-slate-200">Mock Data Generator</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Populate the database with 50 realistic, time-distributed tickets for testing analytics.</p>
+                </div>
+                <button
+                    onClick={handleGenerateMockData}
+                    disabled={isGenerating}
+                    className="px-4 py-2 bg-slate-800 dark:bg-slate-700 text-white rounded-lg text-sm font-bold hover:bg-slate-900 transition-all disabled:bg-slate-300"
+                >
+                    {isGenerating ? 'Generating...' : 'Generate Data'}
+                </button>
             </div>
         </div>
       </Card>

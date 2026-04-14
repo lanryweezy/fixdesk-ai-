@@ -15,8 +15,9 @@ export interface ElectronApi {
     upsertRemoteSession: (session: RemoteSession) => Promise<RemoteSession>;
     getRemoteSession: (ticketId: string) => Promise<RemoteSession | undefined>;
     deleteRemoteSession: (ticketId: string) => Promise<void>;
-    getSettings: () => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string }>;
-    updateSettings: (settings: Partial<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string }>) => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string }>;
+    getSettings: () => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string }>;
+    updateSettings: (settings: Partial<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string }>) => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string }>;
+    generateMockData: () => Promise<boolean>;
     getSystemDiagnostics: () => Promise<any>;
     categorizeAndPrioritize: (title: string, description: string) => Promise<{ priority: 'Low' | 'Medium' | 'High', category: string }>;
     askAboutTicket: (ticket: Ticket, question: string) => Promise<string>;
@@ -25,6 +26,7 @@ export interface ElectronApi {
     generateKbArticle: (ticket: Ticket) => Promise<string>;
     getSystemHealth: (tickets: Ticket[]) => Promise<{ status: string, summary: string, risks: string[] }>;
     startConversation: (videoBase64: string, prompt: string) => Promise<any>;
+    onAIOpsNotification: (callback: (data: { title: string, message: string }) => void) => void;
 }
 
 declare global {

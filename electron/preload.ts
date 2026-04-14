@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteRemoteSession: (ticketId: string) => ipcRenderer.invoke('db-delete-remote-session', ticketId),
   getSettings: () => ipcRenderer.invoke('db-get-settings'),
   updateSettings: (settings: any) => ipcRenderer.invoke('db-update-settings', settings),
+  generateMockData: () => ipcRenderer.invoke('db-generate-mock-data'),
   getSystemDiagnostics: () => ipcRenderer.invoke('get-system-diagnostics'),
 
   // AI actions
@@ -37,6 +38,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   generateKbArticle: (ticket: any) => ipcRenderer.invoke('ai-generate-kb-article', ticket),
   getSystemHealth: (tickets: any) => ipcRenderer.invoke('ai-get-system-health', tickets),
   startConversation: (videoBase64: string, prompt: string) => ipcRenderer.invoke('ai-start-conversation', { videoBase64, prompt }),
+
+  // Event Listeners
+  onAIOpsNotification: (callback: any) => ipcRenderer.on('aiops-notification', (_event, data) => callback(data)),
 
   // Remote control actions (send for one-way communication)
   send: (channel: string, data: any) => {

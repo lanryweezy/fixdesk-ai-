@@ -243,9 +243,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin' })
                 fill="#8884d8"
                 dataKey="value"
                 nameKey="name"
-                label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+                label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
                   if (!percent) return null;
-                  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                  const radius = Number(innerRadius) + (Number(outerRadius) - Number(innerRadius)) * 0.5;
                   const x = cx + radius * Math.cos(-midAngle * (Math.PI / 180));
                   const y = cy + radius * Math.sin(-midAngle * (Math.PI / 180));
                   return (

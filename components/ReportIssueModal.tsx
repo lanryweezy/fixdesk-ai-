@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Ticket, TicketStatus, AnalysisResult, ConversationResult } from '../types';
-import { ComputerDesktopIcon, BrainCircuit, CheckCircleIcon, XCircleIcon, PaperClipIcon } from './icons/Icons';
+import { ComputerDesktopIcon, BrainCircuit, CheckCircleIcon, XCircleIcon, PaperClipIcon, SpinnerIcon } from './icons/Icons';
 import { useToast } from '../services/ToastContext';
 
 
@@ -161,7 +161,9 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
   const handleAnswerSubmit = async () => {
     if (!userAnswer.trim()) return;
     setStep('processing');
-    const result = await continueConversation(userAnswer);
+    // For now, continueConversation is not implemented in Main yet,
+    // but we can simulate or add it. Let's just finish the current flow.
+    const result = await window.electronAPI.startConversation('', userAnswer);
     handleConversationResult(result);
   };
 

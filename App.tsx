@@ -12,12 +12,14 @@ import { ReportIssueModal } from './components/ReportIssueModal';
 import { RemoteControlView } from './components/RemoteControlView';
 import { StartRemoteSession } from './components/StartRemoteSession';
 import { Card } from './components/common/Card';
+import { useToast } from './services/ToastContext';
 import { Ticket, Activity, Solution } from './types';
 import { BrainCircuit, ArrowUturnLeftIcon } from './components/icons/Icons';
 
 export type Page = 'dashboard' | 'tickets' | 'remote' | 'start-remote-session' | 'knowledge-base' | 'settings' | 'kb-article';
 
 export default function App() {
+  const { addToast } = useToast();
   const [page, setPage] = useState<Page>('dashboard');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -28,8 +30,15 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [userName, setUserName] = useState('Alex Smith');
   const [userAvatar, setUserAvatar] = useState('AS');
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState('DEFAULT');
 
   useEffect(() => {
+    // Listen for AIOps events
+    window.electronAPI.onAIOpsNotification((data) => {
+        addToast(`${data.title}: ${data.message}`, 'success');
+        refreshTickets(); // Refresh to show the new auto-generated ticket
+    });
+
     const initApp = async () => {
         // Load tickets
         const storedTickets = await window.electronAPI.getTickets();
@@ -42,6 +51,7 @@ export default function App() {
             setIsDarkMode(storedSettings.isDarkMode);
             if (storedSettings.userName) setUserName(storedSettings.userName);
             if (storedSettings.userAvatar) setUserAvatar(storedSettings.userAvatar);
+            if (storedSettings.activeWorkspaceId) setActiveWorkspaceId(storedSettings.activeWorkspaceId);
         }
     };
     initApp();
@@ -177,6 +187,12 @@ export default function App() {
                 onDarkModeToggle={handleDarkModeToggle}
                 userName={userName}
                 onUpdateProfile={handleUpdateProfile}
+                activeWorkspaceId={activeWorkspaceId}
+                onRefreshData={async () => {
+                    const settings = await window.electronAPI.getSettings();
+                    setActiveWorkspaceId(settings.activeWorkspaceId);
+                    refreshTickets();
+                }}
             />
         );
       case 'remote':

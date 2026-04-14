@@ -54,7 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
-                    setPage(item.page);
+                    setPage(item.page as Page);
                   }}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-base font-medium transition-colors ${
                     currentPage === item.page
@@ -86,7 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
                         href="#"
                         onClick={(e) => {
                             e.preventDefault();
-                            setPage(item.page);
+                            setPage(item.page as Page);
                         }}
                         className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-base font-medium transition-colors ${
                             currentPage === item.page
@@ -117,9 +117,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
             </button>
 
             <div className="p-4 bg-slate-100 dark:bg-slate-700 rounded-lg text-center">
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-                Having trouble? Our AI is here to help you get back on track, fast.
-            </p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Having trouble? Our AI is here to help you get back on track, fast.
+                </p>
+            </div>
         </div>
       </nav>
     </div>

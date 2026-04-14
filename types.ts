@@ -4,7 +4,8 @@ export enum TicketStatus {
   IN_PROGRESS = 'In Progress',
   RESOLVED = 'Resolved',
   NEEDS_ATTENTION = 'Needs Attention',
-  AI_RESOLVED = 'AI Resolved'
+  AI_RESOLVED = 'AI Resolved',
+  SELF_HEALED = 'Self-Healed'
 }
 
 export interface Activity {
@@ -17,6 +18,7 @@ export interface Activity {
 
 export interface Ticket {
   id: string;
+  workspaceId?: string;
   title: string;
   description: string;
   status: TicketStatus;
@@ -38,6 +40,7 @@ export interface RecordedAction {
 
 export interface Solution {
   id: string;
+  workspaceId?: string;
   problemDescription: string;
   solutionDescription: string;
   actions: RecordedAction[];
