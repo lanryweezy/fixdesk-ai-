@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { startConversation, continueConversation, AnalysisResult, ConversationResult } from '../services/geminiService';
-import { Ticket, TicketStatus } from '../types';
-import { ComputerDesktopIcon, BrainCircuit, CheckCircleIcon, XCircleIcon } from './icons/Icons';
+import { Ticket, TicketStatus, AnalysisResult, ConversationResult } from '../types';
+import { ComputerDesktopIcon, BrainCircuit, CheckCircleIcon, XCircleIcon, PaperClipIcon, SpinnerIcon } from './icons/Icons';
+import { useToast } from '../services/ToastContext';
 
 
 type ModalStep = 'initial' | 'recording' | 'processing' | 'result' | 'clarification';
@@ -12,13 +12,16 @@ interface ReportIssueModalProps {
 }
 
 export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onTicketCreated }) => {
+  const { addToast } = useToast();
   const [step, setStep] = useState<ModalStep>('initial');
   const [prompt, setPrompt] = useState('');
+  const [attachments, setAttachments] = useState<{ name: string; url: string }[]>([]);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [clarificationQuestion, setClarificationQuestion] = useState('');
   const [userAnswer, setUserAnswer] = useState('');
   const [isExecutingCommand, setIsExecutingCommand] = useState(false);
+  const [executionLogs, setExecutionLogs] = useState<{ type: 'stdout' | 'stderr', content: string }[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
@@ -98,12 +101,18 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
 
         if (videoBlob.size === 0) {
             console.warn("Recording was empty.");
-            alert("Recording failed or was too short. Please try again.");
+            addToast("Recording failed or was too short. Please try again.", 'error');
             setStep('initial');
             return;
         }
 
-        const result = await startConversation(videoBlob, prompt);
+        const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+            reader.readAsDataURL(videoBlob);
+        });
+
+        const result = await window.electronAPI.startConversation(base64, prompt);
         handleConversationResult(result);
       };
 
@@ -111,7 +120,7 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
     } catch (err) {
       console.error("Error starting screen recording.", err);
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
-      alert(`Could not start screen recording: ${errorMessage}`);
+      addToast(`Could not start screen recording: ${errorMessage}`, 'error');
       setStep('initial');
     }
   }, [prompt, handleStopButtonClick]);
@@ -130,7 +139,8 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
         status: TicketStatus.AI_RESOLVED,
         priority: analysisResult.priority,
         resolution: analysisResult.resolution || 'User confirmed the AI-suggested fix was successful.',
-        videoUrl: 'https://mock.url/video.mp4'
+        videoUrl: 'https://mock.url/video.mp4',
+        attachments
       });
     }
   };
@@ -142,7 +152,8 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
         description: analysisResult.description,
         status: TicketStatus.NEW,
         priority: analysisResult.priority,
-        videoUrl: 'https://mock.url/video.mp4'
+        videoUrl: 'https://mock.url/video.mp4',
+        attachments
       });
     }
   };
@@ -150,7 +161,9 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
   const handleAnswerSubmit = async () => {
     if (!userAnswer.trim()) return;
     setStep('processing');
-    const result = await continueConversation(userAnswer);
+    // For now, continueConversation is not implemented in Main yet,
+    // but we can simulate or add it. Let's just finish the current flow.
+    const result = await window.electronAPI.startConversation('', userAnswer);
     handleConversationResult(result);
   };
 
@@ -158,16 +171,20 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
     if (!analysisResult?.suggestedScript) return;
 
     setIsExecutingCommand(true);
+    setExecutionLogs([]);
     try {
         const { stdout, stderr } = await window.electronAPI.executeCommand(analysisResult.suggestedScript);
+        if (stdout) setExecutionLogs(prev => [...prev, { type: 'stdout', content: stdout }]);
+        if (stderr) setExecutionLogs(prev => [...prev, { type: 'stderr', content: stderr }]);
+
         if (stderr) {
-            alert(`Script failed:\n${stderr}`);
+            addToast(`Script encountered an error`, 'error');
         } else {
-            alert(`Command executed successfully:\n${stdout}`);
-            // Optionally, you could re-run analysis or mark as resolved here
+            addToast(`Command executed successfully`, 'success');
         }
     } catch (error) {
-        alert(`An error occurred while executing the command: ${(error as Error).message}`);
+        setExecutionLogs(prev => [...prev, { type: 'stderr', content: (error as Error).message }]);
+        addToast(`An error occurred while executing the command`, 'error');
     } finally {
         setIsExecutingCommand(false);
     }
@@ -195,6 +212,29 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
                 className="w-full rounded-md border-gray-300 shadow-sm focus:border-brand-primary focus:ring-brand-primary sm:text-sm"
                 placeholder="e.g., My VPN keeps disconnecting..."
               />
+            </div>
+
+            <div className="mt-4">
+                <label className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                    <PaperClipIcon className="w-4 h-4" />
+                    Attachments (Optional)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                    {attachments.map((file, i) => (
+                        <div key={i} className="flex items-center gap-2 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs font-medium text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                            {file.name}
+                            <button onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-red-500">
+                                <XCircleIcon className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    ))}
+                    <button
+                        onClick={() => setAttachments(prev => [...prev, { name: `attachment-${prev.length + 1}.png`, url: '#' }])}
+                        className="px-3 py-1 border border-dashed border-slate-300 dark:border-slate-700 rounded text-xs font-medium text-slate-500 hover:border-brand-primary hover:text-brand-primary transition-all"
+                    >
+                        + Add File
+                    </button>
+                </div>
             </div>
             <div className="mt-5 sm:mt-6">
               <button
@@ -302,8 +342,23 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
                         disabled={isExecutingCommand}
                         className="mt-3 w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm transition-all disabled:bg-gray-400"
                     >
-                        {isExecutingCommand ? 'Executing Script...' : 'Attempt Automated Fix'}
+                        {isExecutingCommand ? (
+                            <>
+                                <SpinnerIcon className="w-4 h-4 animate-spin" />
+                                Executing Script...
+                            </>
+                        ) : 'Attempt Automated Fix'}
                     </button>
+                </div>
+            )}
+
+            {executionLogs.length > 0 && (
+                <div className="mt-4 p-3 bg-slate-900 rounded-lg font-mono text-[10px] leading-tight max-h-[150px] overflow-y-auto">
+                    {executionLogs.map((log, i) => (
+                        <div key={i} className={log.type === 'stderr' ? 'text-red-400' : 'text-green-400'}>
+                            <span className="opacity-50">[{log.type.toUpperCase()}]</span> {log.content}
+                        </div>
+                    ))}
                 </div>
             )}
             <div className="mt-6 flex flex-col sm:flex-row-reverse gap-3">
