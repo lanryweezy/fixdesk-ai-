@@ -196,6 +196,35 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
     }
   };
 
+  const handleApproveMitigation = async () => {
+    if (!ticket.mitigationCommand) return;
+    setIsUpdatingStatus(true);
+    try {
+        const { stdout, stderr } = await window.electronAPI.executeCommand([ticket.mitigationCommand]);
+        const activity: Activity = {
+            id: Math.random().toString(36).substr(2, 9),
+            timestamp: new Date().toISOString(),
+            type: 'resolution',
+            message: `Manually approved and executed AIOps mitigation: ${ticket.mitigationCommand}. Output: ${stdout || stderr}`,
+            user: 'Alex Smith'
+        };
+        const updatedTicket = await window.electronAPI.updateTicket({
+            ...ticket,
+            status: TicketStatus.SELF_HEALED,
+            resolution: `AIOps mitigation executed with manual approval.`,
+            logs: [...(ticket.logs || []), `Manual Fix Output: ${stdout || stderr}`],
+            activities: [...(ticket.activities || []), activity]
+        });
+        setTicket(updatedTicket);
+        if (onUpdate) onUpdate(updatedTicket);
+        addToast('Mitigation command executed successfully', 'success');
+    } catch (error) {
+        addToast('Failed to execute mitigation command', 'error');
+    } finally {
+        setIsUpdatingStatus(false);
+    }
+  };
+
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!chatMessage.trim()) return;
@@ -374,7 +403,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
           {resolution && (
             <div>
               <div className="flex justify-between items-center mb-2">
-                <h3 className="text-lg font-semibold text-slate-700">Resolution</h3>
+                <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200">Resolution</h3>
                 {role === 'admin' && (
                     <button
                         onClick={handleConvertToKB}
@@ -392,6 +421,29 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
                 </div>
               </div>
             </div>
+          )}
+
+          {role === 'admin' && ticket.mitigationCommand && status !== TicketStatus.RESOLVED && status !== TicketStatus.AI_RESOLVED && status !== TicketStatus.SELF_HEALED && (
+             <div className="p-5 border-2 border-brand-primary/20 bg-brand-primary/5 rounded-2xl">
+                <div className="flex items-center gap-3 mb-4">
+                    <BrainCircuit className="w-6 h-6 text-brand-primary" />
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">AIOps Approval Required</h3>
+                        <p className="text-xs text-slate-500">FixDesk AI has identified a potential fix that requires your confirmation.</p>
+                    </div>
+                </div>
+                <div className="bg-slate-900 rounded-lg p-3 font-mono text-xs text-brand-primary mb-4 border border-brand-primary/30">
+                    <span className="opacity-50 text-slate-400">$</span> {ticket.mitigationCommand}
+                </div>
+                <button
+                    onClick={handleApproveMitigation}
+                    disabled={isUpdatingStatus}
+                    className="w-full py-2.5 bg-brand-primary hover:bg-brand-primary/90 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none transition-all flex items-center justify-center gap-2"
+                >
+                    {isUpdatingStatus ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <CogIcon className="w-5 h-5" />}
+                    Approve & Execute Mitigation
+                </button>
+             </div>
           )}
 
           {ticket.activities && ticket.activities.length > 0 && (

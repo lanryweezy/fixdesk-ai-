@@ -37,6 +37,7 @@ type Data = {
     userName: string;
     userAvatar: string;
     activeWorkspaceId: string;
+    aiOpsPolicy: 'autonomous' | 'manual';
   }
 }
 let db: Low<Data>;
@@ -50,7 +51,8 @@ const initDatabase = async () => {
             isDarkMode: false,
             userName: 'Alex Smith',
             userAvatar: 'AS',
-            activeWorkspaceId: 'DEFAULT'
+            activeWorkspaceId: 'DEFAULT',
+            aiOpsPolicy: 'manual'
         }
     };
     const dbPath = path.join(app.getPath('userData'), 'db.json');
@@ -189,11 +191,13 @@ ipcMain.handle('db-create-solution', async (event, solution) => {
 
 ipcMain.handle('db-find-solutions', (event, problemDescription) => {
     const workspaceId = db.data.settings.activeWorkspaceId;
-    const searchTerms = problemDescription.toLowerCase().split(' ');
+    const searchTerms = (problemDescription || '').toLowerCase().split(' ').filter(Boolean);
+    if (searchTerms.length === 0) return [];
+
     return db.data.solutions
         .filter(s => s.workspaceId === workspaceId)
         .filter(solution => {
-            const solutionTerms = solution.problemDescription.toLowerCase().split(' ');
+            const solutionTerms = (solution.problemDescription || '').toLowerCase().split(' ');
             return searchTerms.some(term => solutionTerms.includes(term));
         });
 });
@@ -385,6 +389,7 @@ const triggerAutonomousResolution = async (metrics: any) => {
         });
 
         const aiResponse = JSON.parse(result.response.text());
+        const policy = db.data.settings.aiOpsPolicy || 'manual';
 
         // Create the Autonomous Ticket
         const ticketId = `TICK-AUTO-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
@@ -393,27 +398,35 @@ const triggerAutonomousResolution = async (metrics: any) => {
             workspaceId: db.data.settings.activeWorkspaceId,
             title: `[Self-Healing] ${aiResponse.ticketTitle}`,
             description: aiResponse.ticketDescription,
-            status: 'Self-Healed' as any,
+            status: (policy === 'autonomous' ? 'Self-Healed' : 'Needs Attention') as any,
             priority: 'High',
             reportedBy: 'System Monitor (AIOps)',
             createdAt: new Date().toISOString(),
-            resolution: `Autonomous action taken: ${aiResponse.diagnosis}. Command executed: ${aiResponse.mitigationCommand}`,
+            mitigationCommand: aiResponse.mitigationCommand,
+            resolution: policy === 'autonomous'
+                ? `Autonomous action taken: ${aiResponse.diagnosis}. Command executed: ${aiResponse.mitigationCommand}`
+                : `Autonomous mitigation suggested: ${aiResponse.diagnosis}. Manual approval required.`,
             activities: [
                 {
                     id: Math.random().toString(36).substr(2, 9),
                     timestamp: new Date().toISOString(),
-                    type: 'resolution',
-                    message: `Autonomous diagnosis: ${aiResponse.diagnosis}. Mitigation script executed.`,
+                    type: (policy === 'autonomous' ? 'resolution' : 'note') as any,
+                    message: policy === 'autonomous'
+                        ? `Autonomous diagnosis: ${aiResponse.diagnosis}. Mitigation script executed.`
+                        : `AI suggests mitigation: ${aiResponse.diagnosis}. Policy requires manual approval.`,
                     user: 'FixDesk AI (AIOps)'
                 }
             ]
         };
 
-        // Execute mitigation if command exists
-        if (aiResponse.mitigationCommand) {
-            // Check whitelist (already exists in Main)
+        // Execute mitigation if command exists and policy is autonomous
+        if (aiResponse.mitigationCommand && policy === 'autonomous') {
+            // Check whitelist
+            const forbiddenChars = [';', '&', '|', '>', '<', '`', '$', '(', ')'];
             const baseCmd = aiResponse.mitigationCommand.trim().split(' ')[0].toLowerCase();
-            if (ALLOWED_COMMANDS.includes(baseCmd)) {
+            const hasForbiddenChars = forbiddenChars.some(char => aiResponse.mitigationCommand.includes(char));
+
+            if (ALLOWED_COMMANDS.includes(baseCmd) && !hasForbiddenChars) {
                 exec(aiResponse.mitigationCommand, (err, stdout, stderr) => {
                     newTicket.logs = [`Auto-fix output: ${stdout || stderr}`];
                     db.data.tickets.push(newTicket);
@@ -422,13 +435,16 @@ const triggerAutonomousResolution = async (metrics: any) => {
                 });
             } else {
                  newTicket.status = 'Needs Attention' as any;
-                 newTicket.resolution = `Autonomous mitigation blocked: Command '${baseCmd}' is not in the whitelist. Manual intervention required.`;
+                 newTicket.resolution = `Autonomous mitigation blocked: Security violation or command not in whitelist. Manual intervention required.`;
                  db.data.tickets.push(newTicket);
                  db.write();
             }
         } else {
             db.data.tickets.push(newTicket);
             db.write();
+            if (policy === 'manual' && aiResponse.mitigationCommand) {
+                win?.webContents.send('aiops-notification', { title: 'AIOps Intervention Required', message: aiResponse.diagnosis });
+            }
         }
 
     } catch (error) {

@@ -70,7 +70,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
 
   const stats = useMemo(() => {
     const total = filteredTickets.length;
-    const resolved = filteredTickets.filter(t => t.status === TicketStatus.RESOLVED || t.status === TicketStatus.AI_RESOLVED);
+    const resolved = filteredTickets.filter(t => t.status === TicketStatus.RESOLVED || t.status === TicketStatus.AI_RESOLVED || t.status === TicketStatus.SELF_HEALED);
     const aiCount = tickets.filter(t => t.status === TicketStatus.AI_RESOLVED).length;
     const humanCount = tickets.filter(t => t.status === TicketStatus.RESOLVED).length;
     const autoRate = resolved.length > 0 ? Math.round((aiCount / resolved.length) * 100) : 0;
@@ -141,6 +141,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         .slice(0, 5);
   }, [tickets]);
+
+  const workspaceInsights = useMemo(() => {
+    const priorityCounts = { High: 0, Medium: 0, Low: 0 };
+    const statusCounts: Record<string, number> = {};
+
+    filteredTickets.forEach(t => {
+        priorityCounts[t.priority]++;
+        statusCounts[t.status] = (statusCounts[t.status] || 0) + 1;
+    });
+
+    return { priorityCounts, statusCounts };
+  }, [filteredTickets]);
 
   return (
     <div className="space-y-8">
@@ -233,7 +245,47 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <Card className="lg:col-span-5">
+        <Card className="lg:col-span-2">
+            <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-4">Workspace Priority Load</h3>
+            <div className="space-y-4">
+                {(['High', 'Medium', 'Low'] as const).map(p => {
+                    const count = workspaceInsights.priorityCounts[p];
+                    const percent = stats.total > 0 ? Math.round((count / stats.total) * 100) : 0;
+                    return (
+                        <div key={p}>
+                            <div className="flex justify-between items-center mb-1 text-xs font-bold uppercase tracking-wider">
+                                <span className={p === 'High' ? 'text-red-500' : p === 'Medium' ? 'text-amber-500' : 'text-slate-400'}>{p} Priority</span>
+                                <span className="text-slate-600 dark:text-slate-300">{count} tickets ({percent}%)</span>
+                            </div>
+                            <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-200 dark:border-slate-700/50">
+                                <div
+                                    className={`h-full rounded-full transition-all duration-1000 ${p === 'High' ? 'bg-red-500' : p === 'Medium' ? 'bg-amber-500' : 'bg-slate-400'}`}
+                                    style={{ width: `${percent}%` }}
+                                ></div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+            <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Active Status Distribution</h4>
+                <div className="flex flex-wrap gap-2">
+                    {Object.entries(workspaceInsights.statusCounts).map(([status, count]) => (
+                        <div key={status} className="px-3 py-1 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700 flex items-center gap-2">
+                            <div className={`w-1.5 h-1.5 rounded-full ${
+                                status === 'New' ? 'bg-blue-500' :
+                                status === 'In Progress' ? 'bg-yellow-500' :
+                                status.includes('Resolved') || status === 'Self-Healed' ? 'bg-green-500' :
+                                'bg-slate-400'
+                            }`}></div>
+                            <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase">{status}: {count}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </Card>
+
+        <Card className="lg:col-span-3">
             <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-4">Tickets Created (Last 7 Days)</h3>
             <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={ticketsOverTime}>

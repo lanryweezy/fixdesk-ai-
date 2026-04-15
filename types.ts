@@ -26,6 +26,7 @@ export interface Ticket {
   assignedTo?: string;
   createdAt: string;
   resolution?: string;
+  mitigationCommand?: string;
   videoUrl?: string; // a mock url
   logs?: string[];
   priority: 'Low' | 'Medium' | 'High';

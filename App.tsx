@@ -137,6 +137,13 @@ export default function App() {
     await window.electronAPI.updateSettings({ userName: name, userAvatar: avatar });
   }, []);
 
+  const handleWorkspaceChange = useCallback(async (id: string) => {
+    await window.electronAPI.updateSettings({ activeWorkspaceId: id });
+    setActiveWorkspaceId(id);
+    refreshTickets();
+    addToast(`Switched to workspace: ${id}`, 'success');
+  }, [refreshTickets, addToast]);
+
   const handleSelectSolution = useCallback((solution: Solution) => {
     setSelectedSolution(solution);
     setPage('kb-article');
@@ -216,7 +223,13 @@ export default function App() {
         userName={userName}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header role={role} userName={userName} userAvatar={userAvatar} />
+        <Header
+            role={role}
+            userName={userName}
+            userAvatar={userAvatar}
+            activeWorkspaceId={activeWorkspaceId}
+            onWorkspaceChange={handleWorkspaceChange}
+        />
         <main className="flex-1 overflow-y-auto p-8">
           {renderPage()}
         </main>
