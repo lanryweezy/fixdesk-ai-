@@ -8,4 +8,5 @@ var TicketStatus;
     TicketStatus["RESOLVED"] = "Resolved";
     TicketStatus["NEEDS_ATTENTION"] = "Needs Attention";
     TicketStatus["AI_RESOLVED"] = "AI Resolved";
+    TicketStatus["SELF_HEALED"] = "Self-Healed";
 })(TicketStatus || (exports.TicketStatus = TicketStatus = {}));
