@@ -10,6 +10,18 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
+      window.global = window;
+      window.electronAPI = {
+          getTickets: () => Promise.resolve([]),
+          getSettings: () => Promise.resolve({ role: 'staff', isDarkMode: false, userName: 'Alex Smith', userAvatar: 'AS', activeWorkspaceId: 'DEFAULT', autoLaunch: true }),
+          updateSettings: () => Promise.resolve({}),
+          onAIOpsNotification: () => {},
+          onNavigate: () => {},
+          categorizeAndPrioritize: () => Promise.resolve({ priority: 'Medium', category: 'General' }),
+          getSystemDiagnostics: () => Promise.resolve({ error: 'Mock' }),
+          createTicket: (t) => Promise.resolve(t),
+          exportSupportBundle: () => Promise.resolve(true),
+      };
       tailwind.config = {
         theme: {
           extend: {
@@ -38,5 +50,6 @@
 </head>
   <body class="bg-slate-50 text-slate-800 antialiased">
     <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>

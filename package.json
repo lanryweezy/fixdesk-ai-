@@ -12,6 +12,7 @@
     "build": "npm run build:vite && npx tsc -p tsconfig.electron.json && electron-builder",
     "build:vite": "vite build",
     "preview": "vite preview",
+    "test": "vitest run",
     "postinstall": "electron-builder install-app-deps"
   },
   "build": {
@@ -20,6 +21,7 @@
     "files": [
       "dist/",
       "dist-electron/",
+      "assets/",
       "package.json"
     ],
     "directories": {
@@ -27,24 +29,36 @@
     }
   },
   "dependencies": {
-    "@google/genai": "latest",
+    "@google/generative-ai": "^0.24.1",
+    "@tailwindcss/typography": "^0.5.19",
+    "buffer": "^6.0.3",
+    "fuse.js": "^7.3.0",
     "lowdb": "^7.0.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-markdown": "^10.1.0",
     "recharts": "^3.1.2",
     "robotjs": "^0.6.0",
-    "simple-peer": "^9.11.1"
+    "simple-peer": "^9.11.1",
+    "systeminformation": "^5.31.5"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^22.14.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "@types/simple-peer": "^9.11.8",
     "@vitejs/plugin-react": "^5.0.2",
+    "@vitest/ui": "^4.1.4",
     "concurrently": "^9.2.1",
     "electron": "^38.1.0",
     "electron-builder": "^26.0.12",
+    "jsdom": "^29.0.2",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
+    "vitest": "^4.1.4",
     "wait-on": "^8.0.4"
   }
 }
