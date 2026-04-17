@@ -41,7 +41,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Event Listeners
   onAIOpsNotification: (callback: any) => ipcRenderer.on('aiops-notification', (_event, data) => callback(data)),
-  onNavigate: (callback: any) => ipcRenderer.on('navigate-to', (_event, page) => callback(page)),
 
   // Remote control actions (send for one-way communication)
   send: (channel: string, data: any) => {

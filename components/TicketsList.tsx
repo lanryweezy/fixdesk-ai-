@@ -18,13 +18,19 @@ const StatusBadge: React.FC<{ status: TicketStatus }> = ({ status }) => {
   return <span className={`${baseClasses} ${statusClasses[status]}`}>{status}</span>;
 };
 
-const PriorityBadge: React.FC<{ priority: 'Low' | 'Medium' | 'High' }> = ({ priority }) => {
+const PriorityBadge: React.FC<{ priority: 'Low' | 'Medium' | 'High' | 'Urgent' }> = ({ priority }) => {
     const priorityClasses = {
         'Low': 'text-slate-500',
         'Medium': 'text-amber-600',
-        'High': 'text-red-600'
+        'High': 'text-red-600',
+        'Urgent': 'text-red-800 font-bold'
     };
     return <span className={`font-medium ${priorityClasses[priority]}`}>{priority}</span>
+}
+
+const CategoryBadge: React.FC<{ category: 'Hardware' | 'Software' | 'Network' | 'Account' | 'Other' }> = ({ category }) => {
+    const categoryClasses = 'px-2 py-0.5 text-xs font-medium rounded-full inline-block bg-gray-100 text-gray-700';
+    return <span className={categoryClasses}>{category}</span>
 }
 
 interface TicketItemProps {
@@ -55,6 +61,7 @@ const TicketItem: React.FC<TicketItemProps> = ({ ticket, onSelect }) => {
                 <span className="font-medium">{ticket.reportedBy}</span>
             </div>
             <div className='flex items-center gap-4'>
+                <CategoryBadge category={ticket.category} />
                 <PriorityBadge priority={ticket.priority} />
                 {(ticket.status === TicketStatus.AI_RESOLVED || ticket.status === TicketStatus.SELF_HEALED) && <CogIcon className="w-5 h-5 text-purple-500" title="Resolved by AI" />}
             </div>

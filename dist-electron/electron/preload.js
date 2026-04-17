@@ -38,7 +38,6 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     startConversation: (videoBase64, prompt) => electron_1.ipcRenderer.invoke('ai-start-conversation', { videoBase64, prompt }),
     // Event Listeners
     onAIOpsNotification: (callback) => electron_1.ipcRenderer.on('aiops-notification', (_event, data) => callback(data)),
-    onNavigate: (callback) => electron_1.ipcRenderer.on('navigate-to', (_event, page) => callback(page)),
     // Remote control actions (send for one-way communication)
     send: (channel, data) => {
         if (validChannels.includes(channel)) {

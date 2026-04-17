@@ -12,11 +12,10 @@ interface SettingsProps {
   onUpdateProfile: (name: string) => void;
   activeWorkspaceId?: string;
   aiOpsPolicy?: 'autonomous' | 'manual';
-  autoLaunch?: boolean;
   onRefreshData?: () => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle, isDarkMode, onDarkModeToggle, userName, onUpdateProfile, activeWorkspaceId = 'DEFAULT', aiOpsPolicy = 'manual', autoLaunch = true, onRefreshData }) => {
+export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle, isDarkMode, onDarkModeToggle, userName, onUpdateProfile, activeWorkspaceId = 'DEFAULT', aiOpsPolicy = 'manual', onRefreshData }) => {
     const [editName, setEditName] = React.useState(userName);
     const { addToast } = useToast();
     const [isGenerating, setIsGenerating] = React.useState(false);
@@ -89,28 +88,6 @@ export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle, isDarkMo
                     />
                 </button>
             </div>
-
-                <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                    <div>
-                        <p className="font-bold text-slate-800 dark:text-slate-100">Launch on Startup</p>
-                        <p className="text-sm text-slate-500">Automatically start FixDesk AI when you log in.</p>
-                    </div>
-                    <button
-                        onClick={async () => {
-                            await window.electronAPI.updateSettings({ autoLaunch: !autoLaunch });
-                            if (onRefreshData) onRefreshData();
-                        }}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                            autoLaunch ? 'bg-brand-primary' : 'bg-slate-200 dark:bg-slate-700'
-                        }`}
-                    >
-                        <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                autoLaunch ? 'translate-x-6' : 'translate-x-1'
-                            }`}
-                        />
-                    </button>
-                </div>
 
             <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
                 <div>

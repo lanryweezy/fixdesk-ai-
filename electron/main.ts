@@ -40,7 +40,6 @@ type Data = {
     userAvatar: string;
     activeWorkspaceId: string;
     aiOpsPolicy: 'autonomous' | 'manual';
-    autoLaunch: boolean;
   }
 }
 let db: Low<Data>;
@@ -55,8 +54,7 @@ const initDatabase = async () => {
             userName: 'Alex Smith',
             userAvatar: 'AS',
             activeWorkspaceId: 'DEFAULT',
-            aiOpsPolicy: 'manual',
-            autoLaunch: true
+            aiOpsPolicy: 'manual'
         }
     };
     const dbPath = path.join(app.getPath('userData'), 'db.json');
@@ -269,14 +267,6 @@ ipcMain.handle('db-get-settings', () => {
 ipcMain.handle('db-update-settings', async (event, settings) => {
     db.data.settings = { ...db.data.settings, ...settings };
     await db.write();
-
-    if (settings.autoLaunch !== undefined) {
-        app.setLoginItemSettings({
-            openAtLogin: settings.autoLaunch,
-            path: app.getPath('exe'),
-        });
-    }
-
     return db.data.settings;
 });
 
@@ -681,7 +671,7 @@ ipcMain.handle('ai-start-conversation', async (event, { videoBase64, prompt }) =
         if (videoBase64) {
             parts.push({
                 inlineData: { mimeType: "video/webm", data: videoBase64 }
-            } as any);
+            });
         }
 
         const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
@@ -712,6 +702,5 @@ ipcMain.on('robot-key-tap', (event, key) => {
 
 app.whenReady().then(initDatabase).then(() => {
     createWindow();
-    createTray();
     startMonitoring();
 })

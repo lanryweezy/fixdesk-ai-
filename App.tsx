@@ -31,22 +31,12 @@ export default function App() {
   const [userName, setUserName] = useState('Alex Smith');
   const [userAvatar, setUserAvatar] = useState('AS');
   const [activeWorkspaceId, setActiveWorkspaceId] = useState('DEFAULT');
-  const [aiOpsPolicy, setAiOpsPolicy] = useState<'autonomous' | 'manual'>('manual');
-  const [autoLaunch, setAutoLaunch] = useState(true);
 
   useEffect(() => {
     // Listen for AIOps events
     window.electronAPI.onAIOpsNotification((data) => {
         addToast(`${data.title}: ${data.message}`, 'success');
         refreshTickets(); // Refresh to show the new auto-generated ticket
-    });
-
-    window.electronAPI.onNavigate((target: string) => {
-        if (target === 'report-issue') {
-            setIsModalOpen(true);
-        } else if (target === 'dashboard') {
-            setPage('dashboard');
-        }
     });
 
     const initApp = async () => {
@@ -62,8 +52,6 @@ export default function App() {
             if (storedSettings.userName) setUserName(storedSettings.userName);
             if (storedSettings.userAvatar) setUserAvatar(storedSettings.userAvatar);
             if (storedSettings.activeWorkspaceId) setActiveWorkspaceId(storedSettings.activeWorkspaceId);
-            if (storedSettings.aiOpsPolicy) setAiOpsPolicy(storedSettings.aiOpsPolicy as any);
-            if (storedSettings.autoLaunch !== undefined) setAutoLaunch(storedSettings.autoLaunch);
         }
     };
     initApp();
@@ -207,13 +195,9 @@ export default function App() {
                 userName={userName}
                 onUpdateProfile={handleUpdateProfile}
                 activeWorkspaceId={activeWorkspaceId}
-                aiOpsPolicy={aiOpsPolicy}
-                autoLaunch={autoLaunch}
                 onRefreshData={async () => {
                     const settings = await window.electronAPI.getSettings();
                     setActiveWorkspaceId(settings.activeWorkspaceId);
-                    setAiOpsPolicy(settings.aiOpsPolicy as any);
-                    setAutoLaunch(settings.autoLaunch);
                     refreshTickets();
                 }}
             />

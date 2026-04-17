@@ -15,8 +15,8 @@ export interface ElectronApi {
     upsertRemoteSession: (session: RemoteSession) => Promise<RemoteSession>;
     getRemoteSession: (ticketId: string) => Promise<RemoteSession | undefined>;
     deleteRemoteSession: (ticketId: string) => Promise<void>;
-    getSettings: () => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string, aiOpsPolicy: string, autoLaunch: boolean }>;
-    updateSettings: (settings: Partial<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string, aiOpsPolicy: string, autoLaunch: boolean }>) => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string, aiOpsPolicy: string, autoLaunch: boolean }>;
+    getSettings: () => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string }>;
+    updateSettings: (settings: Partial<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string }>) => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string }>;
     generateMockData: () => Promise<boolean>;
     getSystemDiagnostics: () => Promise<any>;
     categorizeAndPrioritize: (title: string, description: string) => Promise<{ priority: 'Low' | 'Medium' | 'High', category: string }>;
