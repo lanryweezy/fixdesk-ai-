@@ -53,6 +53,43 @@ export const Header: React.FC<HeaderProps> = ({ role, userName, userAvatar, acti
           </div>
         </div>
       </div>
+
+      {isJoinModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[100] animate-in fade-in duration-300">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-brand-primary/10 rounded-lg">
+                        <IdentificationIcon className="w-6 h-6 text-brand-primary" />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Join Workspace</h3>
+                </div>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Enter the workspace code provided by your IT department to link this agent.</p>
+                <input
+                    autoFocus
+                    type="text"
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value)}
+                    placeholder="e.g. COMPANY_XYZ"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-primary outline-none text-slate-800 dark:text-slate-100 font-mono mb-6"
+                />
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => setIsJoinModalOpen(false)}
+                        className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleJoinWorkspace}
+                        disabled={!joinCode.trim()}
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-brand-primary text-white font-bold shadow-lg shadow-indigo-200 dark:shadow-none hover:opacity-90 transition-all disabled:opacity-50"
+                    >
+                        Join
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
     </header>
   );
 };

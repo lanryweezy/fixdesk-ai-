@@ -57,6 +57,7 @@ process.env.VITE_PUBLIC = process.env.VITE_DEV_SERVER_URL
     ? path.join(process.env.DIST, '../public')
     : process.env.DIST;
 let win;
+let tray = null;
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 let db;
@@ -77,14 +78,45 @@ const initDatabase = async () => {
     db = await (0, node_1.JSONFilePreset)(dbPath, defaultData);
 };
 // --- End Database Setup ---
+function createTray() {
+    const iconPath = path.join(__dirname, '../assets/tray-icon.png');
+    const icon = electron_1.nativeImage.createFromPath(iconPath);
+    tray = new electron_1.Tray(icon);
+    const contextMenu = electron_1.Menu.buildFromTemplate([
+        { label: 'Open FixDesk AI', click: () => win?.show() },
+        { label: 'Report an Issue', click: () => {
+                win?.show();
+                win?.webContents.send('navigate-to', 'report-issue');
+            } },
+        { type: 'separator' },
+        { label: 'Quit', click: () => {
+                electron_1.app.isQuitting = true;
+                electron_1.app.quit();
+            } }
+    ]);
+    tray.setToolTip('FixDesk AI Agent');
+    tray.setContextMenu(contextMenu);
+    tray.on('click', () => {
+        win?.isVisible() ? win.hide() : win?.show();
+    });
+}
 function createWindow() {
     win = new electron_1.BrowserWindow({
+        width: 1200,
+        height: 800,
         icon: path.join(process.env.VITE_PUBLIC || '', 'electron-vite.svg'),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
             nodeIntegration: true,
         },
+    });
+    win.on('close', (event) => {
+        if (!electron_1.app.isQuitting) {
+            event.preventDefault();
+            win?.hide();
+        }
+        return false;
     });
     // Test active push message to Renderer-process.
     win.webContents.on('did-finish-load', () => {

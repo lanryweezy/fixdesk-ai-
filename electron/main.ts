@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, desktopCapturer } from 'electron'
+import { app, BrowserWindow, ipcMain, desktopCapturer, Tray, Menu, nativeImage } from 'electron'
 import * as path from 'node:path'
 import robot from 'robotjs'
 import { Low } from 'lowdb'
@@ -23,6 +23,8 @@ process.env.VITE_PUBLIC = process.env.VITE_DEV_SERVER_URL
   : process.env.DIST
 
 let win: BrowserWindow | null
+let tray: Tray | null = null
+
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 
@@ -61,8 +63,36 @@ const initDatabase = async () => {
 // --- End Database Setup ---
 
 
+function createTray() {
+    const iconPath = path.join(__dirname, '../assets/tray-icon.png');
+    const icon = nativeImage.createFromPath(iconPath);
+    tray = new Tray(icon);
+
+    const contextMenu = Menu.buildFromTemplate([
+        { label: 'Open FixDesk AI', click: () => win?.show() },
+        { label: 'Report an Issue', click: () => {
+            win?.show();
+            win?.webContents.send('navigate-to', 'report-issue');
+        }},
+        { type: 'separator' },
+        { label: 'Quit', click: () => {
+            (app as any).isQuitting = true;
+            app.quit();
+        }}
+    ]);
+
+    tray.setToolTip('FixDesk AI Agent');
+    tray.setContextMenu(contextMenu);
+
+    tray.on('click', () => {
+        win?.isVisible() ? win.hide() : win?.show();
+    });
+}
+
 function createWindow() {
   win = new BrowserWindow({
+    width: 1200,
+    height: 800,
     icon: path.join(process.env.VITE_PUBLIC || '', 'electron-vite.svg'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -70,6 +100,14 @@ function createWindow() {
       nodeIntegration: true,
     },
   })
+
+  win.on('close', (event) => {
+    if (!(app as any).isQuitting) {
+        event.preventDefault();
+        win?.hide();
+    }
+    return false;
+  });
 
   // Test active push message to Renderer-process.
   win.webContents.on('did-finish-load', () => {
