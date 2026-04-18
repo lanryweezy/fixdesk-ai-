@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { RecordedAction } from '../types';
+import { useToast } from '../services/ToastContext';
 
 interface SaveSolutionModalProps {
   actions: RecordedAction[];
@@ -8,6 +9,7 @@ interface SaveSolutionModalProps {
 }
 
 export const SaveSolutionModal: React.FC<SaveSolutionModalProps> = ({ actions, onClose, onSave }) => {
+  const { addToast } = useToast();
   const [problemDescription, setProblemDescription] = useState('');
   const [solutionDescription, setSolutionDescription] = useState('');
 
@@ -20,7 +22,7 @@ export const SaveSolutionModal: React.FC<SaveSolutionModalProps> = ({ actions, o
       });
       onClose();
     } else {
-      alert('Please fill out both description fields.');
+      addToast('Please fill out both description fields.', 'error');
     }
   };
 
