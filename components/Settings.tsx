@@ -12,6 +12,14 @@ interface SettingsProps {
   onUpdateProfile: (name: string) => void;
   activeWorkspaceId?: string;
   aiOpsPolicy?: 'autonomous' | 'manual';
+  autoLaunch?: boolean;
+  geminiApiKey?: string;
+  onRefreshData?: () => void;
+}
+
+export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle, isDarkMode, onDarkModeToggle, userName, onUpdateProfile, activeWorkspaceId = 'DEFAULT', aiOpsPolicy = 'manual', autoLaunch = true, geminiApiKey = '', onRefreshData }) => {
+    const [editName, setEditName] = React.useState(userName);
+    const [editApiKey, setEditApiKey] = React.useState(geminiApiKey);
   onRefreshData?: () => void;
 }
 
@@ -86,6 +94,76 @@ export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle, isDarkMo
                             role === 'admin' ? 'translate-x-6' : 'translate-x-1'
                         }`}
                     />
+                </button>
+            </div>
+
+            {role === 'admin' && (
+                <div className="p-4 bg-indigo-50 dark:bg-brand-primary/10 rounded-xl border border-brand-primary/20">
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <p className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                <BrainCircuit className="w-4 h-4 text-brand-primary" />
+                                Gemini AI Configuration
+                            </p>
+                            <p className="text-sm text-slate-500">Provide your Google AI Studio API key to enable AI features.</p>
+                        </div>
+                        <button
+                            onClick={async () => {
+                                await window.electronAPI.updateSettings({ geminiApiKey: editApiKey });
+                                addToast('Gemini API key updated', 'success');
+                                if (onRefreshData) onRefreshData();
+                            }}
+                            className="px-4 py-2 bg-brand-primary text-white text-sm font-bold rounded-lg hover:opacity-90 transition-all"
+                        >
+                            Save Key
+                        </button>
+                    </div>
+                    <input
+                        type="password"
+                        value={editApiKey}
+                        onChange={(e) => setEditApiKey(e.target.value)}
+                        placeholder="Paste your API key here..."
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-brand-primary outline-none"
+                    />
+                    <p className="mt-2 text-[10px] text-slate-400">Your key is stored locally and never sent to our servers.</p>
+                </div>
+            )}
+
+                <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <div>
+                        <p className="font-bold text-slate-800 dark:text-slate-100">Launch on Startup</p>
+                        <p className="text-sm text-slate-500">Automatically start FixDesk AI when you log in.</p>
+                    </div>
+                    <button
+                        onClick={async () => {
+                            await window.electronAPI.updateSettings({ autoLaunch: !autoLaunch });
+                            if (onRefreshData) onRefreshData();
+                        }}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                            autoLaunch ? 'bg-brand-primary' : 'bg-slate-200 dark:bg-slate-700'
+                        }`}
+                    >
+                        <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                autoLaunch ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                        />
+                    </button>
+                </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
+                <div>
+                    <p className="font-semibold text-slate-700 dark:text-slate-200">Support & Diagnostics</p>
+                    <p className="text-xs text-slate-500">Export a bundle of logs and tickets for IT support analysis.</p>
+                </div>
+                <button
+                    onClick={async () => {
+                        const success = await window.electronAPI.exportSupportBundle();
+                        if (success) addToast('Support bundle exported successfully', 'success');
+                    }}
+                    className="px-4 py-2 bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-700 transition-colors"
+                >
+                    Export Support Bundle
                 </button>
             </div>
 

@@ -15,6 +15,10 @@ export interface ElectronApi {
     upsertRemoteSession: (session: RemoteSession) => Promise<RemoteSession>;
     getRemoteSession: (ticketId: string) => Promise<RemoteSession | undefined>;
     deleteRemoteSession: (ticketId: string) => Promise<void>;
+    getSettings: () => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string, aiOpsPolicy: string, autoLaunch: boolean, geminiApiKey?: string }>;
+    updateSettings: (settings: Partial<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string, aiOpsPolicy: string, autoLaunch: boolean, geminiApiKey?: string }>) => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string, aiOpsPolicy: string, autoLaunch: boolean, geminiApiKey?: string }>;
+    generateMockData: () => Promise<boolean>;
+    exportSupportBundle: () => Promise<boolean>;
     getSettings: () => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string }>;
     updateSettings: (settings: Partial<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string }>) => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string }>;
     generateMockData: () => Promise<boolean>;

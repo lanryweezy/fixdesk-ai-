@@ -31,12 +31,24 @@ export default function App() {
   const [userName, setUserName] = useState('Alex Smith');
   const [userAvatar, setUserAvatar] = useState('AS');
   const [activeWorkspaceId, setActiveWorkspaceId] = useState('DEFAULT');
+  const [aiOpsPolicy, setAiOpsPolicy] = useState<'autonomous' | 'manual'>('manual');
+  const [autoLaunch, setAutoLaunch] = useState(true);
+  const [geminiApiKey, setGeminiApiKey] = useState('');
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     // Listen for AIOps events
     window.electronAPI.onAIOpsNotification((data) => {
         addToast(`${data.title}: ${data.message}`, 'success');
         refreshTickets(); // Refresh to show the new auto-generated ticket
+    });
+
+    window.electronAPI.onNavigate((target: string) => {
+        if (target === 'report-issue') {
+            setIsModalOpen(true);
+        } else if (target === 'dashboard') {
+            setPage('dashboard');
+        }
     });
 
     const initApp = async () => {
@@ -52,6 +64,14 @@ export default function App() {
             if (storedSettings.userName) setUserName(storedSettings.userName);
             if (storedSettings.userAvatar) setUserAvatar(storedSettings.userAvatar);
             if (storedSettings.activeWorkspaceId) setActiveWorkspaceId(storedSettings.activeWorkspaceId);
+            if (storedSettings.aiOpsPolicy) setAiOpsPolicy(storedSettings.aiOpsPolicy as any);
+            if (storedSettings.autoLaunch !== undefined) setAutoLaunch(storedSettings.autoLaunch);
+            if (storedSettings.geminiApiKey) setGeminiApiKey(storedSettings.geminiApiKey);
+
+            // Show onboarding if no API key is set
+            if (!storedSettings.geminiApiKey) {
+                setShowOnboarding(true);
+            }
         }
     };
     initApp();
@@ -195,6 +215,15 @@ export default function App() {
                 userName={userName}
                 onUpdateProfile={handleUpdateProfile}
                 activeWorkspaceId={activeWorkspaceId}
+                aiOpsPolicy={aiOpsPolicy}
+                autoLaunch={autoLaunch}
+                geminiApiKey={geminiApiKey}
+                onRefreshData={async () => {
+                    const settings = await window.electronAPI.getSettings();
+                    setActiveWorkspaceId(settings.activeWorkspaceId);
+                    setAiOpsPolicy(settings.aiOpsPolicy as any);
+                    setAutoLaunch(settings.autoLaunch);
+                    setGeminiApiKey(settings.geminiApiKey || '');
                 onRefreshData={async () => {
                     const settings = await window.electronAPI.getSettings();
                     setActiveWorkspaceId(settings.activeWorkspaceId);
@@ -210,6 +239,44 @@ export default function App() {
         return <Dashboard tickets={tickets} />;
     }
   };
+
+  if (showOnboarding) {
+    return (
+        <div className={`flex items-center justify-center h-screen font-sans ${isDarkMode ? 'dark bg-slate-900' : 'bg-slate-100'}`}>
+            <Card className="max-w-md w-full p-10 text-center shadow-2xl">
+                <BrainCircuit className="w-16 h-16 text-brand-primary mx-auto mb-6" />
+                <h1 className="text-3xl font-black text-slate-800 dark:text-slate-100 mb-2 tracking-tight">Welcome to FixDesk AI</h1>
+                <p className="text-slate-500 dark:text-slate-400 mb-8">Let's get your autonomous IT agent set up in a few seconds.</p>
+
+                <div className="space-y-4">
+                    <div className="text-left">
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Gemini API Key</label>
+                        <input
+                            type="password"
+                            placeholder="Enter your Google AI Studio key"
+                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-primary outline-none text-slate-800 dark:text-slate-100"
+                            onChange={(e) => setGeminiApiKey(e.target.value)}
+                        />
+                    </div>
+                    <button
+                        onClick={async () => {
+                            if (geminiApiKey.trim()) {
+                                await window.electronAPI.updateSettings({ geminiApiKey: geminiApiKey.trim(), role: 'admin' });
+                                setShowOnboarding(false);
+                                addToast('Configuration complete!', 'success');
+                            }
+                        }}
+                        disabled={!geminiApiKey.trim()}
+                        className="w-full py-3.5 bg-brand-primary text-white font-bold rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none hover:opacity-90 transition-all disabled:opacity-50"
+                    >
+                        Complete Setup
+                    </button>
+                    <p className="text-[10px] text-slate-400">You can find your API key at <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-brand-primary hover:underline">Google AI Studio</a>.</p>
+                </div>
+            </Card>
+        </div>
+    );
+  }
 
   return (
     <div className={`flex h-screen font-sans ${isDarkMode ? 'dark bg-slate-900 text-slate-100' : 'bg-slate-100 text-slate-800'}`}>

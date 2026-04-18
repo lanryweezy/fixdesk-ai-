@@ -1,5 +1,7 @@
+import { app, BrowserWindow, ipcMain, desktopCapturer, Tray, Menu, nativeImage, dialog } from 'electron'
 import { app, BrowserWindow, ipcMain, desktopCapturer, Tray, Menu, nativeImage } from 'electron'
 import * as path from 'node:path'
+import * as fs from 'node:fs'
 import robot from 'robotjs'
 import { Low } from 'lowdb'
 import { JSONFilePreset } from 'lowdb/node'
@@ -40,6 +42,8 @@ type Data = {
     userAvatar: string;
     activeWorkspaceId: string;
     aiOpsPolicy: 'autonomous' | 'manual';
+    autoLaunch: boolean;
+    geminiApiKey?: string;
   }
 }
 let db: Low<Data>;
@@ -54,6 +58,8 @@ const initDatabase = async () => {
             userName: 'Alex Smith',
             userAvatar: 'AS',
             activeWorkspaceId: 'DEFAULT',
+            aiOpsPolicy: 'manual',
+            autoLaunch: true
             aiOpsPolicy: 'manual'
         }
     };
@@ -267,6 +273,43 @@ ipcMain.handle('db-get-settings', () => {
 ipcMain.handle('db-update-settings', async (event, settings) => {
     db.data.settings = { ...db.data.settings, ...settings };
     await db.write();
+
+    if (settings.geminiApiKey) {
+        genAI = new GoogleGenerativeAI(settings.geminiApiKey);
+    }
+
+    if (settings.autoLaunch !== undefined) {
+        app.setLoginItemSettings({
+            openAtLogin: settings.autoLaunch,
+            path: app.getPath('exe'),
+        });
+    }
+
+    return db.data.settings;
+});
+
+ipcMain.handle('export-support-bundle', async () => {
+    const { filePath } = await dialog.showSaveDialog({
+        title: 'Export Support Bundle',
+        defaultPath: path.join(app.getPath('downloads'), `fixdesk-support-${new Date().toISOString().split('T')[0]}.json`),
+        filters: [{ name: 'JSON', extensions: ['json'] }]
+    });
+
+    if (filePath) {
+        const diagnostics = await si.osInfo();
+        const bundle = {
+            exportedAt: new Date().toISOString(),
+            diagnostics: diagnostics,
+            settings: db.data.settings,
+            tickets: db.data.tickets,
+            solutions: db.data.solutions
+        };
+        fs.writeFileSync(filePath, JSON.stringify(bundle, null, 2));
+        return true;
+    }
+    return false;
+});
+
     return db.data.settings;
 });
 
@@ -369,6 +412,7 @@ ipcMain.handle('execute-command', async (event, commands: string[]) => {
 // --- End Command Execution Handler ---
 
 // --- Gemini AI Handlers ---
+let genAI = new GoogleGenerativeAI(db?.data?.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // --- Self-Healing Monitoring Service ---
@@ -671,6 +715,7 @@ ipcMain.handle('ai-start-conversation', async (event, { videoBase64, prompt }) =
         if (videoBase64) {
             parts.push({
                 inlineData: { mimeType: "video/webm", data: videoBase64 }
+            } as any);
             });
         }
 
@@ -702,5 +747,6 @@ ipcMain.on('robot-key-tap', (event, key) => {
 
 app.whenReady().then(initDatabase).then(() => {
     createWindow();
+    createTray();
     startMonitoring();
 })

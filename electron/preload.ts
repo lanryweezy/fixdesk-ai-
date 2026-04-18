@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSettings: () => ipcRenderer.invoke('db-get-settings'),
   updateSettings: (settings: any) => ipcRenderer.invoke('db-update-settings', settings),
   generateMockData: () => ipcRenderer.invoke('db-generate-mock-data'),
+  exportSupportBundle: () => ipcRenderer.invoke('export-support-bundle'),
   getSystemDiagnostics: () => ipcRenderer.invoke('get-system-diagnostics'),
 
   // AI actions
@@ -41,6 +42,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Event Listeners
   onAIOpsNotification: (callback: any) => ipcRenderer.on('aiops-notification', (_event, data) => callback(data)),
+  onNavigate: (callback: any) => ipcRenderer.on('navigate-to', (_event, page) => callback(page)),
 
   // Remote control actions (send for one-way communication)
   send: (channel: string, data: any) => {

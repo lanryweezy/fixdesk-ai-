@@ -38,6 +38,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const path = __importStar(require("node:path"));
+const fs = __importStar(require("node:fs"));
 const robotjs_1 = __importDefault(require("robotjs"));
 const node_1 = require("lowdb/node");
 const child_process_1 = require("child_process");
@@ -71,6 +72,9 @@ const initDatabase = async () => {
             isDarkMode: false,
             userName: 'Alex Smith',
             userAvatar: 'AS',
+            activeWorkspaceId: 'DEFAULT',
+            aiOpsPolicy: 'manual',
+            autoLaunch: true
             activeWorkspaceId: 'DEFAULT'
         }
     };
@@ -184,6 +188,29 @@ electron_1.ipcMain.handle('db-update-ticket', async (event, updatedTicket) => {
     }
     throw new Error('Ticket not found');
 });
+});
+electron_1.ipcMain.handle('db-update-ticket-status', async (event, id, status) => {
+    const ticket = db.data.tickets.find(t => t.id === id);
+    if (ticket) {
+        ticket.status = status;
+        await db.write();
+        return ticket;
+    }
+    throw new Error('Ticket not found');
+});
+electron_1.ipcMain.handle('db-update-ticket', async (event, updatedTicket) => {
+    const index = db.data.tickets.findIndex(t => t.id === updatedTicket.id);
+    if (index !== -1) {
+        db.data.tickets[index] = updatedTicket;
+        await db.write();
+        // Passive Knowledge Acquisition: Auto-generate KB if resolved
+        if (updatedTicket.status === 'Resolved' || updatedTicket.status === 'AI Resolved' || updatedTicket.status === 'Self-Healed') {
+            triggerPassiveKbGeneration(updatedTicket);
+        }
+        return updatedTicket;
+    }
+    throw new Error('Ticket not found');
+});
 const triggerPassiveKbGeneration = async (ticket) => {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -224,6 +251,13 @@ electron_1.ipcMain.handle('db-create-solution', async (event, solution) => {
 });
 electron_1.ipcMain.handle('db-find-solutions', (event, problemDescription) => {
     const workspaceId = db.data.settings.activeWorkspaceId;
+    const searchTerms = (problemDescription || '').toLowerCase().split(' ').filter(Boolean);
+    if (searchTerms.length === 0)
+        return [];
+    return db.data.solutions
+        .filter(s => s.workspaceId === workspaceId)
+        .filter(solution => {
+        const solutionTerms = (solution.problemDescription || '').toLowerCase().split(' ');
     const searchTerms = problemDescription.toLowerCase().split(' ');
     return db.data.solutions
         .filter(s => s.workspaceId === workspaceId)
@@ -256,6 +290,37 @@ electron_1.ipcMain.handle('db-get-settings', () => {
 electron_1.ipcMain.handle('db-update-settings', async (event, settings) => {
     db.data.settings = { ...db.data.settings, ...settings };
     await db.write();
+    if (settings.geminiApiKey) {
+        genAI = new generative_ai_1.GoogleGenerativeAI(settings.geminiApiKey);
+    }
+    if (settings.autoLaunch !== undefined) {
+        electron_1.app.setLoginItemSettings({
+            openAtLogin: settings.autoLaunch,
+            path: electron_1.app.getPath('exe'),
+        });
+    }
+    return db.data.settings;
+});
+electron_1.ipcMain.handle('export-support-bundle', async () => {
+    const { filePath } = await electron_1.dialog.showSaveDialog({
+        title: 'Export Support Bundle',
+        defaultPath: path.join(electron_1.app.getPath('downloads'), `fixdesk-support-${new Date().toISOString().split('T')[0]}.json`),
+        filters: [{ name: 'JSON', extensions: ['json'] }]
+    });
+    if (filePath) {
+        const diagnostics = await systeminformation_1.default.osInfo();
+        const bundle = {
+            exportedAt: new Date().toISOString(),
+            diagnostics: diagnostics,
+            settings: db.data.settings,
+            tickets: db.data.tickets,
+            solutions: db.data.solutions
+        };
+        fs.writeFileSync(filePath, JSON.stringify(bundle, null, 2));
+        return true;
+    }
+    return false;
+});
     return db.data.settings;
 });
 electron_1.ipcMain.handle('db-generate-mock-data', async () => {
@@ -310,11 +375,18 @@ electron_1.ipcMain.handle('db-generate-mock-data', async () => {
 const ALLOWED_COMMANDS = ['ping', 'ifconfig', 'ipconfig', 'netstat', 'ls', 'dir', 'uptime', 'whoami', 'df', 'free'];
 electron_1.ipcMain.handle('execute-command', async (event, commands) => {
     const isAllowed = (cmd) => {
+        // 1. Check for command chaining characters
+        const forbiddenChars = [';', '&', '|', '>', '<', '`', '$', '(', ')'];
+        if (forbiddenChars.some(char => cmd.includes(char))) {
+            return false;
+        }
+        // 2. Check the base command against the whitelist
         const baseCmd = cmd.trim().split(' ')[0].toLowerCase();
         return ALLOWED_COMMANDS.includes(baseCmd);
     };
     const execPromise = (command) => {
         if (!isAllowed(command)) {
+            return Promise.resolve({ stdout: '', stderr: `Blocked: Command '${command}' contains forbidden characters or is not in the whitelist.` });
             return Promise.resolve({ stdout: '', stderr: `Blocked: Command '${command}' is not in the whitelist.` });
         }
         return new Promise((resolve) => {
@@ -339,6 +411,7 @@ electron_1.ipcMain.handle('execute-command', async (event, commands) => {
 });
 // --- End Command Execution Handler ---
 // --- Gemini AI Handlers ---
+let genAI = new generative_ai_1.GoogleGenerativeAI(db?.data?.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
 const genAI = new generative_ai_1.GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 // --- Self-Healing Monitoring Service ---
 let monitoringInterval = null;
@@ -391,6 +464,7 @@ const triggerAutonomousResolution = async (metrics) => {
             generationConfig: { responseMimeType: "application/json" }
         });
         const aiResponse = JSON.parse(result.response.text());
+        const policy = db.data.settings.aiOpsPolicy || 'manual';
         // Create the Autonomous Ticket
         const ticketId = `TICK-AUTO-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
         const newTicket = {
@@ -398,6 +472,14 @@ const triggerAutonomousResolution = async (metrics) => {
             workspaceId: db.data.settings.activeWorkspaceId,
             title: `[Self-Healing] ${aiResponse.ticketTitle}`,
             description: aiResponse.ticketDescription,
+            status: (policy === 'autonomous' ? 'Self-Healed' : 'Needs Attention'),
+            priority: 'High',
+            reportedBy: 'System Monitor (AIOps)',
+            createdAt: new Date().toISOString(),
+            mitigationCommand: aiResponse.mitigationCommand,
+            resolution: policy === 'autonomous'
+                ? `Autonomous action taken: ${aiResponse.diagnosis}. Command executed: ${aiResponse.mitigationCommand}`
+                : `Autonomous mitigation suggested: ${aiResponse.diagnosis}. Manual approval required.`,
             status: 'Self-Healed',
             priority: 'High',
             reportedBy: 'System Monitor (AIOps)',
@@ -407,12 +489,23 @@ const triggerAutonomousResolution = async (metrics) => {
                 {
                     id: Math.random().toString(36).substr(2, 9),
                     timestamp: new Date().toISOString(),
+                    type: (policy === 'autonomous' ? 'resolution' : 'note'),
+                    message: policy === 'autonomous'
+                        ? `Autonomous diagnosis: ${aiResponse.diagnosis}. Mitigation script executed.`
+                        : `AI suggests mitigation: ${aiResponse.diagnosis}. Policy requires manual approval.`,
                     type: 'resolution',
                     message: `Autonomous diagnosis: ${aiResponse.diagnosis}. Mitigation script executed.`,
                     user: 'FixDesk AI (AIOps)'
                 }
             ]
         };
+        // Execute mitigation if command exists and policy is autonomous
+        if (aiResponse.mitigationCommand && policy === 'autonomous') {
+            // Check whitelist
+            const forbiddenChars = [';', '&', '|', '>', '<', '`', '$', '(', ')'];
+            const baseCmd = aiResponse.mitigationCommand.trim().split(' ')[0].toLowerCase();
+            const hasForbiddenChars = forbiddenChars.some(char => aiResponse.mitigationCommand.includes(char));
+            if (ALLOWED_COMMANDS.includes(baseCmd) && !hasForbiddenChars) {
         // Execute mitigation if command exists
         if (aiResponse.mitigationCommand) {
             // Check whitelist (already exists in Main)
@@ -427,6 +520,7 @@ const triggerAutonomousResolution = async (metrics) => {
             }
             else {
                 newTicket.status = 'Needs Attention';
+                newTicket.resolution = `Autonomous mitigation blocked: Security violation or command not in whitelist. Manual intervention required.`;
                 newTicket.resolution = `Autonomous mitigation blocked: Command '${baseCmd}' is not in the whitelist. Manual intervention required.`;
                 db.data.tickets.push(newTicket);
                 db.write();
@@ -435,6 +529,9 @@ const triggerAutonomousResolution = async (metrics) => {
         else {
             db.data.tickets.push(newTicket);
             db.write();
+            if (policy === 'manual' && aiResponse.mitigationCommand) {
+                win?.webContents.send('aiops-notification', { title: 'AIOps Intervention Required', message: aiResponse.diagnosis });
+            }
         }
     }
     catch (error) {
@@ -587,6 +684,50 @@ electron_1.ipcMain.handle('ai-get-system-health', async (event, tickets) => {
 });
 electron_1.ipcMain.handle('ai-start-conversation', async (event, { videoBase64, prompt }) => {
     try {
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
+        const systemPrompt = `
+            You are an expert IT Support Engineer. Analyze the provided video of a user issue and their description.
+            Determine if you have enough information to resolve it.
+
+            If YES (Resolution found):
+            Respond with:
+            {
+                "type": "analysis",
+                "data": {
+                    "title": "Short descriptive title",
+                    "description": "Clear explanation of the problem",
+                    "resolution": "Step-by-step resolution steps",
+                    "status": "Resolved",
+                    "priority": "Low" | "Medium" | "High",
+                    "suggestedScript": ["ls", "df"] // Optional shell commands from whitelist
+                }
+            }
+
+            If NO (Need more info):
+            Respond with:
+            {
+                "type": "question",
+                "question": "The specific question you need to ask the user"
+            }
+        `;
+        const parts = [
+            { text: systemPrompt },
+            { text: `USER DESCRIPTION: ${prompt}` },
+        ];
+        if (videoBase64) {
+            parts.push({
+                inlineData: { mimeType: "video/webm", data: videoBase64 }
+            });
+        }
+        const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
+        return JSON.parse(result.response.text());
+    }
+    catch (error) {
+        console.error("AI Conversation Error:", error);
+        return { type: 'error', message: 'AI Analysis failed. Please try a manual description.' };
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         // Minimal implementation for now to fix the dependency issue
         const result = await model.generateContent([
@@ -624,5 +765,6 @@ electron_1.ipcMain.on('robot-key-tap', (event, key) => {
 });
 electron_1.app.whenReady().then(initDatabase).then(() => {
     createWindow();
+    createTray();
     startMonitoring();
 });
