@@ -224,6 +224,9 @@ export default function App() {
                     setAiOpsPolicy(settings.aiOpsPolicy as any);
                     setAutoLaunch(settings.autoLaunch);
                     setGeminiApiKey(settings.geminiApiKey || '');
+                onRefreshData={async () => {
+                    const settings = await window.electronAPI.getSettings();
+                    setActiveWorkspaceId(settings.activeWorkspaceId);
                     refreshTickets();
                 }}
             />

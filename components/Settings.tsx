@@ -20,6 +20,11 @@ interface SettingsProps {
 export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle, isDarkMode, onDarkModeToggle, userName, onUpdateProfile, activeWorkspaceId = 'DEFAULT', aiOpsPolicy = 'manual', autoLaunch = true, geminiApiKey = '', onRefreshData }) => {
     const [editName, setEditName] = React.useState(userName);
     const [editApiKey, setEditApiKey] = React.useState(geminiApiKey);
+  onRefreshData?: () => void;
+}
+
+export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle, isDarkMode, onDarkModeToggle, userName, onUpdateProfile, activeWorkspaceId = 'DEFAULT', aiOpsPolicy = 'manual', onRefreshData }) => {
+    const [editName, setEditName] = React.useState(userName);
     const { addToast } = useToast();
     const [isGenerating, setIsGenerating] = React.useState(false);
 

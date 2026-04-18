@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, desktopCapturer, Tray, Menu, nativeImage, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, desktopCapturer, Tray, Menu, nativeImage } from 'electron'
 import * as path from 'node:path'
 import * as fs from 'node:fs'
 import robot from 'robotjs'
@@ -59,6 +60,7 @@ const initDatabase = async () => {
             activeWorkspaceId: 'DEFAULT',
             aiOpsPolicy: 'manual',
             autoLaunch: true
+            aiOpsPolicy: 'manual'
         }
     };
     const dbPath = path.join(app.getPath('userData'), 'db.json');
@@ -308,6 +310,9 @@ ipcMain.handle('export-support-bundle', async () => {
     return false;
 });
 
+    return db.data.settings;
+});
+
 ipcMain.handle('db-generate-mock-data', async () => {
     const statuses: TicketStatus[] = ['New', 'In Progress', 'Resolved', 'Needs Attention', 'AI Resolved'] as any;
     const priorities: ('Low' | 'Medium' | 'High')[] = ['Low', 'Medium', 'High'];
@@ -408,6 +413,7 @@ ipcMain.handle('execute-command', async (event, commands: string[]) => {
 
 // --- Gemini AI Handlers ---
 let genAI = new GoogleGenerativeAI(db?.data?.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // --- Self-Healing Monitoring Service ---
 let monitoringInterval: NodeJS.Timeout | null = null;
@@ -710,6 +716,7 @@ ipcMain.handle('ai-start-conversation', async (event, { videoBase64, prompt }) =
             parts.push({
                 inlineData: { mimeType: "video/webm", data: videoBase64 }
             } as any);
+            });
         }
 
         const result = await model.generateContent({ contents: [{ role: 'user', parts }] });

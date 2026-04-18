@@ -75,6 +75,7 @@ const initDatabase = async () => {
             activeWorkspaceId: 'DEFAULT',
             aiOpsPolicy: 'manual',
             autoLaunch: true
+            activeWorkspaceId: 'DEFAULT'
         }
     };
     const dbPath = path.join(electron_1.app.getPath('userData'), 'db.json');
@@ -187,6 +188,29 @@ electron_1.ipcMain.handle('db-update-ticket', async (event, updatedTicket) => {
     }
     throw new Error('Ticket not found');
 });
+});
+electron_1.ipcMain.handle('db-update-ticket-status', async (event, id, status) => {
+    const ticket = db.data.tickets.find(t => t.id === id);
+    if (ticket) {
+        ticket.status = status;
+        await db.write();
+        return ticket;
+    }
+    throw new Error('Ticket not found');
+});
+electron_1.ipcMain.handle('db-update-ticket', async (event, updatedTicket) => {
+    const index = db.data.tickets.findIndex(t => t.id === updatedTicket.id);
+    if (index !== -1) {
+        db.data.tickets[index] = updatedTicket;
+        await db.write();
+        // Passive Knowledge Acquisition: Auto-generate KB if resolved
+        if (updatedTicket.status === 'Resolved' || updatedTicket.status === 'AI Resolved' || updatedTicket.status === 'Self-Healed') {
+            triggerPassiveKbGeneration(updatedTicket);
+        }
+        return updatedTicket;
+    }
+    throw new Error('Ticket not found');
+});
 const triggerPassiveKbGeneration = async (ticket) => {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -234,6 +258,11 @@ electron_1.ipcMain.handle('db-find-solutions', (event, problemDescription) => {
         .filter(s => s.workspaceId === workspaceId)
         .filter(solution => {
         const solutionTerms = (solution.problemDescription || '').toLowerCase().split(' ');
+    const searchTerms = problemDescription.toLowerCase().split(' ');
+    return db.data.solutions
+        .filter(s => s.workspaceId === workspaceId)
+        .filter(solution => {
+        const solutionTerms = solution.problemDescription.toLowerCase().split(' ');
         return searchTerms.some(term => solutionTerms.includes(term));
     });
 });
@@ -291,6 +320,8 @@ electron_1.ipcMain.handle('export-support-bundle', async () => {
         return true;
     }
     return false;
+});
+    return db.data.settings;
 });
 electron_1.ipcMain.handle('db-generate-mock-data', async () => {
     const statuses = ['New', 'In Progress', 'Resolved', 'Needs Attention', 'AI Resolved'];
@@ -356,6 +387,7 @@ electron_1.ipcMain.handle('execute-command', async (event, commands) => {
     const execPromise = (command) => {
         if (!isAllowed(command)) {
             return Promise.resolve({ stdout: '', stderr: `Blocked: Command '${command}' contains forbidden characters or is not in the whitelist.` });
+            return Promise.resolve({ stdout: '', stderr: `Blocked: Command '${command}' is not in the whitelist.` });
         }
         return new Promise((resolve) => {
             (0, child_process_1.exec)(command, (error, stdout, stderr) => {
@@ -380,6 +412,7 @@ electron_1.ipcMain.handle('execute-command', async (event, commands) => {
 // --- End Command Execution Handler ---
 // --- Gemini AI Handlers ---
 let genAI = new generative_ai_1.GoogleGenerativeAI(db?.data?.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
+const genAI = new generative_ai_1.GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 // --- Self-Healing Monitoring Service ---
 let monitoringInterval = null;
 const startMonitoring = () => {
@@ -447,6 +480,11 @@ const triggerAutonomousResolution = async (metrics) => {
             resolution: policy === 'autonomous'
                 ? `Autonomous action taken: ${aiResponse.diagnosis}. Command executed: ${aiResponse.mitigationCommand}`
                 : `Autonomous mitigation suggested: ${aiResponse.diagnosis}. Manual approval required.`,
+            status: 'Self-Healed',
+            priority: 'High',
+            reportedBy: 'System Monitor (AIOps)',
+            createdAt: new Date().toISOString(),
+            resolution: `Autonomous action taken: ${aiResponse.diagnosis}. Command executed: ${aiResponse.mitigationCommand}`,
             activities: [
                 {
                     id: Math.random().toString(36).substr(2, 9),
@@ -455,6 +493,8 @@ const triggerAutonomousResolution = async (metrics) => {
                     message: policy === 'autonomous'
                         ? `Autonomous diagnosis: ${aiResponse.diagnosis}. Mitigation script executed.`
                         : `AI suggests mitigation: ${aiResponse.diagnosis}. Policy requires manual approval.`,
+                    type: 'resolution',
+                    message: `Autonomous diagnosis: ${aiResponse.diagnosis}. Mitigation script executed.`,
                     user: 'FixDesk AI (AIOps)'
                 }
             ]
@@ -466,6 +506,11 @@ const triggerAutonomousResolution = async (metrics) => {
             const baseCmd = aiResponse.mitigationCommand.trim().split(' ')[0].toLowerCase();
             const hasForbiddenChars = forbiddenChars.some(char => aiResponse.mitigationCommand.includes(char));
             if (ALLOWED_COMMANDS.includes(baseCmd) && !hasForbiddenChars) {
+        // Execute mitigation if command exists
+        if (aiResponse.mitigationCommand) {
+            // Check whitelist (already exists in Main)
+            const baseCmd = aiResponse.mitigationCommand.trim().split(' ')[0].toLowerCase();
+            if (ALLOWED_COMMANDS.includes(baseCmd)) {
                 (0, child_process_1.exec)(aiResponse.mitigationCommand, (err, stdout, stderr) => {
                     newTicket.logs = [`Auto-fix output: ${stdout || stderr}`];
                     db.data.tickets.push(newTicket);
@@ -476,6 +521,7 @@ const triggerAutonomousResolution = async (metrics) => {
             else {
                 newTicket.status = 'Needs Attention';
                 newTicket.resolution = `Autonomous mitigation blocked: Security violation or command not in whitelist. Manual intervention required.`;
+                newTicket.resolution = `Autonomous mitigation blocked: Command '${baseCmd}' is not in the whitelist. Manual intervention required.`;
                 db.data.tickets.push(newTicket);
                 db.write();
             }
@@ -682,6 +728,25 @@ electron_1.ipcMain.handle('ai-start-conversation', async (event, { videoBase64, 
     catch (error) {
         console.error("AI Conversation Error:", error);
         return { type: 'error', message: 'AI Analysis failed. Please try a manual description.' };
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        // Minimal implementation for now to fix the dependency issue
+        const result = await model.generateContent([
+            { text: `Analyze this IT issue: ${prompt}` },
+            { inlineData: { mimeType: "video/webm", data: videoBase64 } }
+        ]);
+        // Mocking a structured response for now
+        return {
+            type: 'analysis',
+            data: {
+                title: prompt,
+                description: result.response.text(),
+                status: 'New',
+                priority: 'Medium'
+            }
+        };
+    }
+    catch (error) {
+        return { type: 'error', message: 'AI Analysis failed.' };
     }
 });
 // --- End Gemini AI Handlers ---

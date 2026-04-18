@@ -299,7 +299,7 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
   };
 
   const {
-    id, title, description, status, reportedBy, assignedTo, createdAt, resolution, logs, videoUrl
+    id, title, description, status, reportedBy, assignedTo, createdAt, resolution, logs, videoUrl, priority, category
   } = ticket;
 
   return (
@@ -368,8 +368,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
             </div>
           </div>
           <div>
-            <h4 className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Date Created</h4>
-            <p className="text-slate-700 font-medium">{new Date(createdAt).toLocaleString()}</p>
+            <h4 className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Priority</h4>
+            <p className="text-slate-700 font-medium">{priority}</p>
           </div>
         </div>
 

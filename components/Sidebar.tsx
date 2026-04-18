@@ -19,6 +19,9 @@ const navItems = [
   { name: 'Tickets', icon: TicketIcon, page: 'tickets', roles: ['staff', 'admin'] },
   { name: 'Knowledge Base', icon: BrainCircuit, page: 'knowledge-base', roles: ['staff', 'admin'] },
   { name: 'Help & Support', icon: UserGroupIcon, page: 'start-remote-session', roles: ['staff'] },
+  { name: 'My Tickets', icon: TicketIcon, page: 'tickets', roles: ['staff', 'admin'] },
+  { name: 'Knowledge Base', icon: BrainCircuit, page: 'knowledge-base', roles: ['staff', 'admin'] },
+  { name: 'Start Remote Session', icon: UserGroupIcon, page: 'start-remote-session', roles: ['staff'] },
   { name: 'Settings', icon: Cog8ToothIcon, page: 'settings', roles: ['staff', 'admin'] },
 ];
 
