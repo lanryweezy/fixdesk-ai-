@@ -241,7 +241,7 @@ export default function App() {
       case 'dashboard':
         return <Dashboard tickets={tickets} role={role} />;
       case 'tickets':
-        return <TicketsList tickets={tickets} onSelectTicket={handleSelectTicket} role={role} onRefresh={refreshTickets} />;
+        return <TicketsList tickets={tickets} onSelectTicket={handleSelectTicket} role={role} userName={userName} onRefresh={refreshTickets} />;
       case 'knowledge-base':
         return <KnowledgeBase role={role} onSelectSolution={handleSelectSolution} />;
       case 'settings':

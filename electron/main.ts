@@ -384,6 +384,43 @@ ipcMain.handle('export-support-bundle', async () => {
     return false;
 });
 
+ipcMain.handle('ai-analyze-support-bundle', async (event) => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+        title: 'Select Support Bundle for AI Analysis',
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        properties: ['openFile']
+    });
+
+    if (canceled || filePaths.length === 0) return null;
+
+    try {
+        const bundleContent = fs.readFileSync(filePaths[0], 'utf-8');
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `
+            You are an expert Enterprise IT Systems Analyst. Analyze this FixDesk AI Support Bundle.
+            It contains system diagnostics, ticket history, and knowledge base solutions.
+
+            Perform the following:
+            1. **Pattern Recognition**: Identify recurring technical failures or user behavior patterns.
+            2. **Resolution Efficiency**: Assess if the existing solutions are actually solving the root causes.
+            3. **AIOps Health Score**: Provide a score from 0-100 on workspace automation and stability.
+            4. **Strategic Recommendations**: 3 high-impact actions for the IT team.
+
+            BUNDLE DATA (truncated if too large): ${bundleContent.substring(0, 30000)}
+
+            Respond in professional Markdown.
+        `;
+        const result = await model.generateContent(prompt);
+        return {
+            analysis: result.response.text(),
+            fileName: path.basename(filePaths[0])
+        };
+    } catch (error) {
+        console.error("Support Bundle Analysis Error:", error);
+        throw error;
+    }
+});
+
 ipcMain.handle('db-generate-mock-data', async () => {
     const statuses: TicketStatus[] = ['New', 'In Progress', 'Resolved', 'Needs Attention', 'AI Resolved'] as any;
     const priorities: ('Low' | 'Medium' | 'High')[] = ['Low', 'Medium', 'High'];
@@ -440,7 +477,7 @@ ipcMain.handle('db-generate-mock-data', async () => {
 // --- End Database Handlers ---
 
 // --- Command Execution Handler ---
-const ALLOWED_COMMANDS = ['ping', 'ifconfig', 'ipconfig', 'netstat', 'ls', 'dir', 'uptime', 'whoami', 'df', 'free'];
+const ALLOWED_COMMANDS = ['ping', 'ifconfig', 'ipconfig', 'netstat', 'ls', 'dir', 'uptime', 'whoami', 'df', 'free', 'ps', 'top', 'pkill', 'systemctl', 'journalctl'];
 
 ipcMain.handle('execute-command', async (event, commands: string[]) => {
   const isAllowed = (cmd: string) => {
@@ -496,15 +533,22 @@ const startMonitoring = () => {
             const mem = await si.mem();
             const cpu = await si.currentLoad();
             const disk = await si.fsSize();
+            const processes = await si.processes();
 
             const memUsage = (mem.active / mem.total) * 100;
             const cpuUsage = cpu.currentLoad;
             const diskUsage = disk[0]?.use || 0;
 
-            // Thresholds for autonomous action
+            // Top 5 processes by CPU
+            const topProcesses = processes.list
+                .sort((a, b) => b.cpu - a.cpu)
+                .slice(0, 5)
+                .map(p => ({ name: p.name, cpu: p.cpu, mem: p.mem, pid: p.pid }));
+
+            // Thresholds for autonomous action (lowered for demo purposes if needed, but keeping 90 for logic)
             if (memUsage > 90 || cpuUsage > 90 || diskUsage > 90) {
                 console.log(`[AIOps] Critical metrics detected: CPU ${cpuUsage.toFixed(1)}%, Mem ${memUsage.toFixed(1)}%, Disk ${diskUsage.toFixed(1)}%`);
-                await triggerAutonomousResolution({ cpuUsage, memUsage, diskUsage });
+                await triggerAutonomousResolution({ cpuUsage, memUsage, diskUsage, topProcesses });
             }
         } catch (error) {
             console.error('[AIOps] Monitoring error:', error);
@@ -522,8 +566,13 @@ const triggerAutonomousResolution = async (metrics: any) => {
             Memory: ${metrics.memUsage.toFixed(1)}%
             Disk: ${metrics.diskUsage.toFixed(1)}%
 
-            1. Diagnose the likely issue.
-            2. Suggest a safe, automated shell command to mitigate it (e.g., clearing temp files if disk is high, or identifying a runaway process).
+            TOP PROCESSES:
+            ${JSON.stringify(metrics.topProcesses)}
+
+            1. Diagnose the likely issue using the metrics and top processes.
+            2. Suggest a safe, automated shell command to mitigate it.
+               ALLOWED COMMANDS: ping, ifconfig, ipconfig, netstat, ls, dir, uptime, whoami, df, free, ps, top, pkill, systemctl, journalctl.
+               Example: If a process 'bad_app' is consuming 90% CPU, suggest 'pkill bad_app'.
             3. Provide a ticket title and description.
 
             Respond with ONLY a JSON object:
@@ -622,18 +671,32 @@ ipcMain.handle('ai-categorize-prioritize', async (event, { title, description })
     }
 });
 
-ipcMain.handle('ai-chat', async (event, { message, history }) => {
+ipcMain.handle('ai-chat', async (event, { message, history, screenshot }) => {
     try {
         const model = genAI.getGenerativeModel({
             model: "gemini-1.5-flash",
             systemInstruction: "You are a helpful IT Support Assistant for FixDesk AI. Your goal is to help employees solve technical issues. Be professional, concise, and friendly. If you cannot solve something, suggest they report an issue."
         } as any);
 
-        const chat = model.startChat({
-            history: history || [],
-        });
+        const contents = [];
+        if (history) {
+            contents.push(...history);
+        }
 
-        const result = await chat.sendMessage(message);
+        const userParts: any[] = [{ text: message }];
+        if (screenshot) {
+            // screenshot is base64 string
+            userParts.push({
+                inlineData: {
+                    mimeType: "image/png",
+                    data: screenshot.split(',')[1] // Remove data:image/png;base64,
+                }
+            });
+        }
+
+        contents.push({ role: 'user', parts: userParts });
+
+        const result = await model.generateContent({ contents });
         return result.response.text();
     } catch (error: any) {
         console.error("AI Chat Error:", error);
@@ -643,7 +706,6 @@ ipcMain.handle('ai-chat', async (event, { message, history }) => {
 
 ipcMain.handle('ai-ask-about-ticket', async (event, { ticket, question }) => {
     try {
-        if (!process.env.GEMINI_API_KEY) throw new Error('API key missing');
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `You are an IT support assistant. Answer the user question about this ticket.
 
@@ -667,7 +729,6 @@ ipcMain.handle('ai-ask-about-ticket', async (event, { ticket, question }) => {
 
 ipcMain.handle('ai-draft-response', async (event, ticket) => {
     try {
-        if (!process.env.GEMINI_API_KEY) throw new Error('API key missing');
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `Draft a professional response for this ticket: ${JSON.stringify(ticket)}`;
         const result = await model.generateContent(prompt);
@@ -777,6 +838,56 @@ ipcMain.handle('ai-get-system-health', async (event, tickets) => {
         return JSON.parse(result.response.text());
     } catch (error) {
         return { status: 'Healthy', summary: 'System operational.', risks: ['None identified'] };
+    }
+});
+
+ipcMain.handle('ai-root-cause-analysis', async (event, ticket) => {
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `
+            Perform a deep technical root cause analysis (RCA) for the following IT ticket.
+            Consider the description, any provided diagnostics logs, and the activity history.
+
+            TICKET: ${JSON.stringify(ticket)}
+
+            Provide the analysis in markdown format with the following sections:
+            - **Root Cause Hypothesis**: What is the most likely technical cause?
+            - **Technical Deep Dive**: Explain the underlying system mechanism involved.
+            - **Long-term Prevention**: How to prevent this from recurring.
+            - **Confidence Level**: (Low, Medium, or High)
+        `;
+        const result = await model.generateContent(prompt);
+        return result.response.text();
+    } catch (error) {
+        console.error("RCA Error:", error);
+        return "Failed to perform root cause analysis.";
+    }
+});
+
+ipcMain.handle('ai-parse-search-query', async (event, query) => {
+    try {
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
+        const prompt = `
+            Parse the following natural language IT ticket search query into structured filter criteria.
+            QUERY: "${query}"
+
+            Respond with ONLY a JSON object:
+            {
+                "status": "New" | "In Progress" | "Resolved" | "AI Resolved" | "Needs Attention" | "Self-Healed" | null,
+                "priority": "Low" | "Medium" | "High" | null,
+                "category": "string" | null,
+                "timeRange": "24h" | "7d" | "30d" | null,
+                "keyword": "string" | null
+            }
+        `;
+        const result = await model.generateContent(prompt);
+        return JSON.parse(result.response.text());
+    } catch (error) {
+        console.error("Search Query Parsing Error:", error);
+        return { status: null, priority: null, category: null, timeRange: null, keyword: query };
     }
 });
 

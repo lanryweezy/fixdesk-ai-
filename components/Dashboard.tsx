@@ -4,7 +4,8 @@ import { Card } from './common/Card';
 import { mockAnalyticsData } from '../constants';
 import { Ticket, TicketStatus, Activity } from '../types';
 import { ITTerminal } from './ITTerminal';
-import { ChatBubbleBottomCenterTextIcon, BrainCircuit, ShieldCheckIcon, SpinnerIcon } from './icons/Icons';
+import ReactMarkdown from 'react-markdown';
+import { ChatBubbleBottomCenterTextIcon, BrainCircuit, ShieldCheckIcon, SpinnerIcon, CloudArrowDownIcon, DocumentTextIcon, XMarkIcon } from './icons/Icons';
 
 const PIE_COLORS = { 'FixDesk AI': '#4F46E5', 'IT Support Team': '#A78BFA' };
 
@@ -28,6 +29,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
   const [isLoadingHealth, setIsLoadingHealth] = React.useState(false);
   const [dateRange, setDateRange] = React.useState<'24h' | '7d' | '30d'>('7d');
   const [liveMetrics, setLiveMetrics] = React.useState({ cpuUsage: 0, memUsage: 0, diskUsage: 0 });
+  const [bundleAnalysis, setBundleAnalysis] = React.useState<{ analysis: string, fileName: string } | null>(null);
+  const [isAnalyzingBundle, setIsAnalyzingBundle] = React.useState(false);
 
   React.useEffect(() => {
     const fetchMetrics = async () => {
@@ -58,6 +61,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
     };
     fetchHealth();
   }, [tickets, role]);
+
+  const handleAnalyzeBundle = async () => {
+    setIsAnalyzingBundle(true);
+    try {
+        const result = await window.electronAPI.analyzeSupportBundle();
+        if (result) setBundleAnalysis(result);
+    } catch (e) {
+        console.error("Analysis failed", e);
+    } finally {
+        setIsAnalyzingBundle(false);
+    }
+  };
   
   const filteredTickets = useMemo(() => {
     const now = new Date().getTime();
@@ -72,8 +87,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
   const stats = useMemo(() => {
     const total = filteredTickets.length;
     const resolved = filteredTickets.filter(t => t.status === TicketStatus.RESOLVED || t.status === TicketStatus.AI_RESOLVED || t.status === TicketStatus.SELF_HEALED);
-    const aiCount = tickets.filter(t => t.status === TicketStatus.AI_RESOLVED).length;
-    const humanCount = tickets.filter(t => t.status === TicketStatus.RESOLVED).length;
+    const aiCount = filteredTickets.filter(t => t.status === TicketStatus.AI_RESOLVED || t.status === TicketStatus.SELF_HEALED).length;
+    const humanCount = filteredTickets.filter(t => t.status === TicketStatus.RESOLVED).length;
     const autoRate = resolved.length > 0 ? Math.round((aiCount / resolved.length) * 100) : 0;
 
     // Calculate average resolution time
@@ -90,7 +105,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
     const avgResHours = Math.round((avgResMs / (1000 * 60 * 60)) * 10) / 10;
 
     return { total, resolvedCount: resolved.length, aiCount, humanCount, autoRate, avgResHours };
-  }, [tickets]);
+  }, [filteredTickets]);
 
   const resolutionByData = useMemo(() => [
       { name: 'FixDesk AI', value: stats.aiCount },
@@ -143,6 +158,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
         .slice(0, 5);
   }, [tickets]);
 
+  const aiOpsActivities = useMemo(() => {
+    return tickets
+        .filter(t => t.reportedBy === 'System Monitor (AIOps)' || t.status === TicketStatus.SELF_HEALED)
+        .flatMap(t => (t.activities || []).map(a => ({ ...a, ticketTitle: t.title, ticketId: t.id, status: t.status, resolution: t.resolution })))
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 5);
+  }, [tickets]);
+
   const workspaceInsights = useMemo(() => {
     const priorityCounts = { High: 0, Medium: 0, Low: 0 };
     const statusCounts: Record<string, number> = {};
@@ -159,7 +182,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
     <div className="space-y-8">
       <div className="flex justify-between items-start">
         <div className="space-y-1">
-            <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Analytics & IT Insights</h2>
+            <div className="flex items-center gap-4">
+                <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Analytics & IT Insights</h2>
+                {role === 'admin' && (
+                    <button
+                        onClick={handleAnalyzeBundle}
+                        disabled={isAnalyzingBundle}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-brand-primary text-white text-xs font-bold rounded-lg hover:opacity-90 transition-all disabled:opacity-50"
+                    >
+                        {isAnalyzingBundle ? <SpinnerIcon className="w-4 h-4 animate-spin" /> : <DocumentTextIcon className="w-4 h-4" />}
+                        AI Bundle Analysis
+                    </button>
+                )}
+            </div>
             <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-wider">
                 <div className="flex items-center gap-1.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-brand-primary animate-pulse"></div>
@@ -190,6 +225,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
         </div>
       </div>
 
+      {bundleAnalysis && (
+        <Card className="border-2 border-brand-primary/20 relative animate-in fade-in slide-in-from-top-2 duration-300">
+            <button
+                onClick={() => setBundleAnalysis(null)}
+                className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+            >
+                <XMarkIcon className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-brand-primary/10 rounded-lg">
+                    <BrainCircuit className="w-6 h-6 text-brand-primary" />
+                </div>
+                <div>
+                    <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg">Support Bundle Intelligence Report</h3>
+                    <p className="text-xs text-slate-400 font-medium">Source: {bundleAnalysis.fileName}</p>
+                </div>
+            </div>
+            <div className="prose prose-sm dark:prose-invert max-w-none prose-indigo bg-slate-50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-100 dark:border-slate-800">
+                <ReactMarkdown>{bundleAnalysis.analysis}</ReactMarkdown>
+            </div>
+        </Card>
+      )}
+
       {role === 'admin' && (
         <Card className="p-0 overflow-hidden mb-8">
             <div className="flex flex-col md:flex-row">
@@ -204,7 +262,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
                         <>
                             <ShieldCheckIcon className="w-10 h-10 mb-2" />
                             <h3 className="text-xl font-bold uppercase tracking-tight">{systemHealth?.status || 'Healthy'}</h3>
-                            <p className="text-[10px] opacity-80 mt-1 font-bold">System Health</p>
+                            <p className="text-[10px] opacity-80 mt-1 font-bold">AIOps Status</p>
                         </>
                     )}
                 </div>
@@ -364,6 +422,43 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
             <div className="lg:col-span-5">
                 <ITTerminal />
             </div>
+        )}
+
+        {role === 'admin' && aiOpsActivities.length > 0 && (
+            <Card className="lg:col-span-5 border-l-4 border-l-brand-primary">
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-brand-primary/10 rounded-lg">
+                            <BrainCircuit className="w-5 h-5 text-brand-primary" />
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">AIOps Autonomous Activity Log</h3>
+                    </div>
+                    <span className="text-[10px] font-black text-brand-primary uppercase tracking-widest bg-brand-primary/10 px-2 py-1 rounded">Live Monitoring</span>
+                </div>
+                <div className="space-y-4">
+                    {aiOpsActivities.map((activity, idx) => (
+                        <div key={idx} className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center gap-4 transition-all hover:border-brand-primary/30">
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                        activity.status === TicketStatus.SELF_HEALED ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                                    }`}>
+                                        {activity.status}
+                                    </span>
+                                    <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm">{activity.ticketTitle}</h4>
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 italic">
+                                    "{activity.message}"
+                                </p>
+                            </div>
+                            <div className="md:w-64 text-right">
+                                <p className="text-[10px] text-slate-400 font-bold uppercase">{new Date(activity.timestamp).toLocaleString()}</p>
+                                <p className="text-[10px] text-brand-primary font-bold truncate mt-0.5">{activity.ticketId}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </Card>
         )}
 
         {role === 'admin' && allActivities.length > 0 && (

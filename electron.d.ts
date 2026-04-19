@@ -21,13 +21,16 @@ export interface ElectronApi {
     generateMockData: () => Promise<boolean>;
     exportSupportBundle: () => Promise<boolean>;
     getSystemDiagnostics: () => Promise<any>;
-    aiChat: (message: string, history: any[]) => Promise<string>;
+    aiChat: (message: string, history: any[], screenshot?: string) => Promise<string>;
     categorizeAndPrioritize: (title: string, description: string) => Promise<{ priority: 'Low' | 'Medium' | 'High', category: string }>;
     askAboutTicket: (ticket: Ticket, question: string) => Promise<string>;
     draftAiResponse: (ticket: Ticket) => Promise<string>;
     summarizeTicket: (ticket: Ticket) => Promise<string>;
     generateKbArticle: (ticket: Ticket) => Promise<string>;
     getSystemHealth: (tickets: Ticket[]) => Promise<{ status: string, summary: string, risks: string[] }>;
+    rootCauseAnalysis: (ticket: Ticket) => Promise<string>;
+    parseSearchQuery: (query: string) => Promise<{ status: any, priority: any, category: any, timeRange: any, keyword: any }>;
+    analyzeSupportBundle: () => Promise<{ analysis: string, fileName: string } | null>;
     startConversation: (videoBase64: string, prompt: string) => Promise<any>;
     onAIOpsNotification: (callback: (data: { title: string, message: string }) => void) => void;
 }

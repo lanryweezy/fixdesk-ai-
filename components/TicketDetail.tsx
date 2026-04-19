@@ -52,6 +52,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
   }, [chatHistory, isTyping]);
   const [summary, setSummary] = useState<string | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [rca, setRca] = useState<string | null>(null);
+  const [isAnalyzingRCA, setIsAnalyzingRCA] = useState(false);
 
   useEffect(() => {
     const fetchRecommendedSolutions = async () => {
@@ -270,6 +272,19 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
     }
   };
 
+  const handleRCA = async () => {
+    setIsAnalyzingRCA(true);
+    try {
+        const result = await window.electronAPI.rootCauseAnalysis(ticket);
+        setRca(result);
+        addToast('Root cause analysis complete', 'success');
+    } catch (error) {
+        addToast('Failed to perform RCA', 'error');
+    } finally {
+        setIsAnalyzingRCA(false);
+    }
+  };
+
   const handleAddInternalNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!internalNote.trim()) return;
@@ -318,14 +333,24 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
             <div className="flex items-center gap-3">
                 <p className="text-sm text-slate-500">{id}</p>
                 {role === 'admin' && (
-                    <button
-                        onClick={handleSummarize}
-                        disabled={isSummarizing}
-                        className="flex items-center gap-1.5 text-xs font-bold text-brand-primary hover:text-brand-secondary transition-colors"
-                    >
-                        <ListBulletIcon className="w-3.5 h-3.5" />
-                        {isSummarizing ? 'Summarizing...' : 'AI Summary'}
-                    </button>
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={handleSummarize}
+                            disabled={isSummarizing}
+                            className="flex items-center gap-1.5 text-xs font-bold text-brand-primary hover:text-brand-secondary transition-colors"
+                        >
+                            <ListBulletIcon className="w-3.5 h-3.5" />
+                            {isSummarizing ? 'Summarizing...' : 'AI Summary'}
+                        </button>
+                        <button
+                            onClick={handleRCA}
+                            disabled={isAnalyzingRCA}
+                            className="flex items-center gap-1.5 text-xs font-bold text-brand-primary hover:text-brand-secondary transition-colors"
+                        >
+                            <BrainCircuit className="w-3.5 h-3.5" />
+                            {isAnalyzingRCA ? 'Analyzing...' : 'Root Cause Analysis'}
+                        </button>
+                    </div>
                 )}
             </div>
             <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100 mt-1">{title}</h2>
@@ -381,6 +406,18 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
                     FixDesk AI Summary
                 </h3>
                 <p className="text-sm text-amber-900 dark:text-amber-200 italic leading-relaxed">{summary}</p>
+             </div>
+          )}
+
+          {rca && (
+             <div className="p-6 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700/50 rounded-xl">
+                <h3 className="text-xs font-bold text-indigo-800 dark:text-indigo-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <BrainCircuit className="w-4 h-4" />
+                    Technical Root Cause Analysis
+                </h3>
+                <div className="prose dark:prose-invert max-w-none prose-sm prose-indigo">
+                    <ReactMarkdown>{rca}</ReactMarkdown>
+                </div>
              </div>
           )}
 

@@ -33,13 +33,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSystemDiagnostics: () => ipcRenderer.invoke('get-system-diagnostics'),
 
   // AI actions
-  aiChat: (message: string, history: any[]) => ipcRenderer.invoke('ai-chat', { message, history }),
+  aiChat: (message: string, history: any[], screenshot?: string) => ipcRenderer.invoke('ai-chat', { message, history, screenshot }),
   categorizeAndPrioritize: (title: string, description: string) => ipcRenderer.invoke('ai-categorize-prioritize', { title, description }),
   askAboutTicket: (ticket: any, question: string) => ipcRenderer.invoke('ai-ask-about-ticket', { ticket, question }),
   draftAiResponse: (ticket: any) => ipcRenderer.invoke('ai-draft-response', ticket),
   summarizeTicket: (ticket: any) => ipcRenderer.invoke('ai-summarize-ticket', ticket),
   generateKbArticle: (ticket: any) => ipcRenderer.invoke('ai-generate-kb-article', ticket),
   getSystemHealth: (tickets: any) => ipcRenderer.invoke('ai-get-system-health', tickets),
+  rootCauseAnalysis: (ticket: any) => ipcRenderer.invoke('ai-root-cause-analysis', ticket),
+  parseSearchQuery: (query: string) => ipcRenderer.invoke('ai-parse-search-query', query),
+  analyzeSupportBundle: () => ipcRenderer.invoke('ai-analyze-support-bundle'),
   startConversation: (videoBase64: string, prompt: string) => ipcRenderer.invoke('ai-start-conversation', { videoBase64, prompt }),
 
   // Event Listeners

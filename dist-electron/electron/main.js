@@ -40,6 +40,7 @@ const electron_1 = require("electron");
 const path = __importStar(require("node:path"));
 const fs = __importStar(require("node:fs"));
 const robotjs_1 = __importDefault(require("robotjs"));
+const lowdb_1 = require("lowdb");
 const node_1 = require("lowdb/node");
 const child_process_1 = require("child_process");
 const generative_ai_1 = require("@google/generative-ai");
@@ -62,6 +63,37 @@ let tray = null;
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 let db;
+class EncryptedJSONAdapter {
+    constructor(filename) {
+        this.adapter = new node_1.TextFile(filename);
+    }
+    async read() {
+        const text = await this.adapter.read();
+        if (!text)
+            return null;
+        try {
+            if (electron_1.safeStorage.isEncryptionAvailable()) {
+                const decrypted = electron_1.safeStorage.decryptString(Buffer.from(text, 'base64'));
+                return JSON.parse(decrypted);
+            }
+            return JSON.parse(text);
+        }
+        catch (e) {
+            // Fallback for non-encrypted data or error
+            return JSON.parse(text);
+        }
+    }
+    async write(data) {
+        const text = JSON.stringify(data);
+        if (electron_1.safeStorage.isEncryptionAvailable()) {
+            const encrypted = electron_1.safeStorage.encryptString(text);
+            await this.adapter.write(encrypted.toString('base64'));
+        }
+        else {
+            await this.adapter.write(text);
+        }
+    }
+}
 const initDatabase = async () => {
     const defaultData = {
         tickets: [],
@@ -77,8 +109,42 @@ const initDatabase = async () => {
             autoLaunch: true
         }
     };
-    const dbPath = path.join(electron_1.app.getPath('userData'), 'db.json');
-    db = await (0, node_1.JSONFilePreset)(dbPath, defaultData);
+    const dbPath = path.join(electron_1.app.getPath('userData'), 'db.enc.json');
+    const adapter = new EncryptedJSONAdapter(dbPath);
+    db = new lowdb_1.Low(adapter, defaultData);
+    await db.read();
+    // Decrypt API key if it exists
+    if (db.data.settings.geminiApiKey && electron_1.safeStorage.isEncryptionAvailable()) {
+        try {
+            const encryptedBuffer = Buffer.from(db.data.settings.geminiApiKey, 'base64');
+            const decryptedKey = electron_1.safeStorage.decryptString(encryptedBuffer);
+            genAI = new generative_ai_1.GoogleGenerativeAI(decryptedKey);
+        }
+        catch (e) {
+            console.error('Failed to decrypt Gemini API Key:', e);
+        }
+    }
+    // --- Enterprise Provisioning (MDM / GPO Support) ---
+    // If an Admin provides keys via environment variables, they override local settings
+    const enterpriseApiKey = process.env.FIXDESK_API_KEY;
+    const enterpriseWorkspace = process.env.FIXDESK_WORKSPACE;
+    const enterprisePolicy = process.env.FIXDESK_AIOPS_POLICY;
+    if (enterpriseApiKey) {
+        genAI = new generative_ai_1.GoogleGenerativeAI(enterpriseApiKey);
+        db.data.settings.geminiApiKey = electron_1.safeStorage.isEncryptionAvailable()
+            ? electron_1.safeStorage.encryptString(enterpriseApiKey).toString('base64')
+            : enterpriseApiKey;
+    }
+    if (enterpriseWorkspace) {
+        db.data.settings.activeWorkspaceId = enterpriseWorkspace;
+    }
+    if (enterprisePolicy && ['autonomous', 'manual'].includes(enterprisePolicy)) {
+        db.data.settings.aiOpsPolicy = enterprisePolicy;
+    }
+    if (enterpriseApiKey || enterpriseWorkspace || enterprisePolicy) {
+        await db.write();
+        console.log('[Enterprise] Provisions applied from environment.');
+    }
 };
 // --- End Database Setup ---
 function createTray() {
@@ -259,9 +325,16 @@ electron_1.ipcMain.handle('db-get-settings', () => {
     return db.data.settings;
 });
 electron_1.ipcMain.handle('db-update-settings', async (event, settings) => {
+    // Handle sensitive Gemini API Key with safeStorage
+    if (settings.geminiApiKey && electron_1.safeStorage.isEncryptionAvailable()) {
+        const encryptedKey = electron_1.safeStorage.encryptString(settings.geminiApiKey);
+        // We store it as a base64 string in the JSON DB
+        settings.geminiApiKey = encryptedKey.toString('base64');
+    }
     db.data.settings = { ...db.data.settings, ...settings };
     await db.write();
     if (settings.geminiApiKey) {
+        // If it was just updated, we use the raw value passed in for this session
         genAI = new generative_ai_1.GoogleGenerativeAI(settings.geminiApiKey);
     }
     if (settings.autoLaunch !== undefined) {
@@ -291,6 +364,42 @@ electron_1.ipcMain.handle('export-support-bundle', async () => {
         return true;
     }
     return false;
+});
+electron_1.ipcMain.handle('ai-analyze-support-bundle', async (event) => {
+    const { canceled, filePaths } = await electron_1.dialog.showOpenDialog({
+        title: 'Select Support Bundle for AI Analysis',
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        properties: ['openFile']
+    });
+    if (canceled || filePaths.length === 0)
+        return null;
+    try {
+        const bundleContent = fs.readFileSync(filePaths[0], 'utf-8');
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `
+            You are an expert Enterprise IT Systems Analyst. Analyze this FixDesk AI Support Bundle.
+            It contains system diagnostics, ticket history, and knowledge base solutions.
+
+            Perform the following:
+            1. **Pattern Recognition**: Identify recurring technical failures or user behavior patterns.
+            2. **Resolution Efficiency**: Assess if the existing solutions are actually solving the root causes.
+            3. **AIOps Health Score**: Provide a score from 0-100 on workspace automation and stability.
+            4. **Strategic Recommendations**: 3 high-impact actions for the IT team.
+
+            BUNDLE DATA (truncated if too large): ${bundleContent.substring(0, 30000)}
+
+            Respond in professional Markdown.
+        `;
+        const result = await model.generateContent(prompt);
+        return {
+            analysis: result.response.text(),
+            fileName: path.basename(filePaths[0])
+        };
+    }
+    catch (error) {
+        console.error("Support Bundle Analysis Error:", error);
+        throw error;
+    }
 });
 electron_1.ipcMain.handle('db-generate-mock-data', async () => {
     const statuses = ['New', 'In Progress', 'Resolved', 'Needs Attention', 'AI Resolved'];
@@ -510,6 +619,35 @@ electron_1.ipcMain.handle('ai-categorize-prioritize', async (event, { title, des
         return { priority: 'Medium', category: 'General' };
     }
 });
+electron_1.ipcMain.handle('ai-chat', async (event, { message, history, screenshot }) => {
+    try {
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            systemInstruction: "You are a helpful IT Support Assistant for FixDesk AI. Your goal is to help employees solve technical issues. Be professional, concise, and friendly. If you cannot solve something, suggest they report an issue."
+        });
+        const contents = [];
+        if (history) {
+            contents.push(...history);
+        }
+        const userParts = [{ text: message }];
+        if (screenshot) {
+            // screenshot is base64 string
+            userParts.push({
+                inlineData: {
+                    mimeType: "image/png",
+                    data: screenshot.split(',')[1] // Remove data:image/png;base64,
+                }
+            });
+        }
+        contents.push({ role: 'user', parts: userParts });
+        const result = await model.generateContent({ contents });
+        return result.response.text();
+    }
+    catch (error) {
+        console.error("AI Chat Error:", error);
+        return `AI Error: ${error.message || "Unknown error occurred."}`;
+    }
+});
 electron_1.ipcMain.handle('ai-ask-about-ticket', async (event, { ticket, question }) => {
     try {
         if (!process.env.GEMINI_API_KEY)
@@ -586,6 +724,22 @@ electron_1.ipcMain.handle('get-system-diagnostics', async () => {
         return { error: 'Failed to gather diagnostics' };
     }
 });
+electron_1.ipcMain.handle('get-system-metrics', async () => {
+    try {
+        const cpu = await systeminformation_1.default.currentLoad();
+        const mem = await systeminformation_1.default.mem();
+        const disk = await systeminformation_1.default.fsSize();
+        return {
+            cpuUsage: Math.round(cpu.currentLoad),
+            memUsage: Math.round((mem.active / mem.total) * 100),
+            diskUsage: Math.round(disk[0]?.use || 0)
+        };
+    }
+    catch (error) {
+        console.error('Metrics error:', error);
+        return { cpuUsage: 0, memUsage: 0, diskUsage: 0 };
+    }
+});
 electron_1.ipcMain.handle('ai-generate-kb-article', async (event, ticket) => {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -634,6 +788,56 @@ electron_1.ipcMain.handle('ai-get-system-health', async (event, tickets) => {
     }
     catch (error) {
         return { status: 'Healthy', summary: 'System operational.', risks: ['None identified'] };
+    }
+});
+electron_1.ipcMain.handle('ai-root-cause-analysis', async (event, ticket) => {
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `
+            Perform a deep technical root cause analysis (RCA) for the following IT ticket.
+            Consider the description, any provided diagnostics logs, and the activity history.
+
+            TICKET: ${JSON.stringify(ticket)}
+
+            Provide the analysis in markdown format with the following sections:
+            - **Root Cause Hypothesis**: What is the most likely technical cause?
+            - **Technical Deep Dive**: Explain the underlying system mechanism involved.
+            - **Long-term Prevention**: How to prevent this from recurring.
+            - **Confidence Level**: (Low, Medium, or High)
+        `;
+        const result = await model.generateContent(prompt);
+        return result.response.text();
+    }
+    catch (error) {
+        console.error("RCA Error:", error);
+        return "Failed to perform root cause analysis.";
+    }
+});
+electron_1.ipcMain.handle('ai-parse-search-query', async (event, query) => {
+    try {
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
+        const prompt = `
+            Parse the following natural language IT ticket search query into structured filter criteria.
+            QUERY: "${query}"
+
+            Respond with ONLY a JSON object:
+            {
+                "status": "New" | "In Progress" | "Resolved" | "AI Resolved" | "Needs Attention" | "Self-Healed" | null,
+                "priority": "Low" | "Medium" | "High" | null,
+                "category": "string" | null,
+                "timeRange": "24h" | "7d" | "30d" | null,
+                "keyword": "string" | null
+            }
+        `;
+        const result = await model.generateContent(prompt);
+        return JSON.parse(result.response.text());
+    }
+    catch (error) {
+        console.error("Search Query Parsing Error:", error);
+        return { status: null, priority: null, category: null, timeRange: null, keyword: query };
     }
 });
 electron_1.ipcMain.handle('ai-start-conversation', async (event, { videoBase64, prompt }) => {

@@ -41,7 +41,7 @@ describe('TicketsList Component', () => {
 
   it('filters tickets based on search term', () => {
     render(<TicketsList tickets={mockTickets} onSelectTicket={vi.fn()} role="admin" />);
-    const searchInput = screen.getByPlaceholderText('Search tickets...');
+    const searchInput = screen.getByPlaceholderText(/Ask AI/i);
     fireEvent.change(searchInput, { target: { value: 'Hardware' } });
     expect(screen.queryByText('VPN issue')).not.toBeInTheDocument();
     expect(screen.getByText('Hardware fail')).toBeInTheDocument();

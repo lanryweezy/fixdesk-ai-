@@ -11,17 +11,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
       window.global = window;
-      window.electronAPI = {
-          getTickets: () => Promise.resolve([]),
-          getSettings: () => Promise.resolve({ role: 'staff', isDarkMode: false, userName: 'Alex Smith', userAvatar: 'AS', activeWorkspaceId: 'DEFAULT', autoLaunch: true }),
-          updateSettings: () => Promise.resolve({}),
-          onAIOpsNotification: () => {},
-          onNavigate: () => {},
-          categorizeAndPrioritize: () => Promise.resolve({ priority: 'Medium', category: 'General' }),
-          getSystemDiagnostics: () => Promise.resolve({ error: 'Mock' }),
-          createTicket: (t) => Promise.resolve(t),
-          exportSupportBundle: () => Promise.resolve(true),
-      };
       tailwind.config = {
         theme: {
           extend: {
