@@ -138,6 +138,7 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
         description: analysisResult.description,
         status: TicketStatus.AI_RESOLVED,
         priority: analysisResult.priority,
+        sentiment: (analysisResult as any).sentiment,
         resolution: analysisResult.resolution || 'User confirmed the AI-suggested fix was successful.',
         videoUrl: 'https://mock.url/video.mp4',
         attachments
@@ -152,6 +153,7 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
         description: analysisResult.description,
         status: TicketStatus.NEW,
         priority: analysisResult.priority,
+        sentiment: (analysisResult as any).sentiment,
         videoUrl: 'https://mock.url/video.mp4',
         attachments
       });

@@ -29,6 +29,7 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     updateSettings: (settings) => electron_1.ipcRenderer.invoke('db-update-settings', settings),
     generateMockData: () => electron_1.ipcRenderer.invoke('db-generate-mock-data'),
     exportSupportBundle: () => electron_1.ipcRenderer.invoke('export-support-bundle'),
+    getAuditLogs: () => electron_1.ipcRenderer.invoke('db-get-audit-logs'),
     getSystemDiagnostics: () => electron_1.ipcRenderer.invoke('get-system-diagnostics'),
     // AI actions
     aiChat: (message, history, screenshot) => electron_1.ipcRenderer.invoke('ai-chat', { message, history, screenshot }),

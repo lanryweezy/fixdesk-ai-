@@ -34,6 +34,14 @@ type Data = {
   tickets: Ticket[];
   solutions: Solution[];
   remoteSessions: RemoteSession[];
+  auditLogs: {
+    id: string;
+    timestamp: string;
+    user: string;
+    command: string;
+    outcome: 'Success' | 'Failure' | 'Blocked';
+    reason?: string;
+  }[];
   settings: {
     role: 'staff' | 'admin';
     isDarkMode: boolean;
@@ -82,6 +90,7 @@ const initDatabase = async () => {
         tickets: [],
         solutions: [],
         remoteSessions: [],
+        auditLogs: [],
         settings: {
             role: 'admin',
             isDarkMode: false,
@@ -481,41 +490,48 @@ const ALLOWED_COMMANDS = ['ping', 'ifconfig', 'ipconfig', 'netstat', 'ls', 'dir'
 
 ipcMain.handle('execute-command', async (event, commands: string[]) => {
   const isAllowed = (cmd: string) => {
-    // 1. Check for command chaining characters
     const forbiddenChars = [';', '&', '|', '>', '<', '`', '$', '(', ')'];
-    if (forbiddenChars.some(char => cmd.includes(char))) {
-        return false;
-    }
-
-    // 2. Check the base command against the whitelist
+    if (forbiddenChars.some(char => cmd.includes(char))) return false;
     const baseCmd = cmd.trim().split(' ')[0].toLowerCase();
     return ALLOWED_COMMANDS.includes(baseCmd);
   };
 
-  const execPromise = (command: string) => {
-    if (!isAllowed(command)) {
-        return Promise.resolve({ stdout: '', stderr: `Blocked: Command '${command}' contains forbidden characters or is not in the whitelist.` });
-    }
-    return new Promise<{ stdout: string; stderr: string }>((resolve) => {
-      exec(command, (error, stdout, stderr) => {
-        // We resolve even if there's an error, but we include the stderr.
-        // The renderer process will be responsible for checking the stderr property.
-        resolve({ stdout, stderr });
-      });
-    });
-  };
-
   const results = { stdout: '', stderr: '' };
   for (const command of commands) {
-    const result = await execPromise(command);
-    results.stdout += result.stdout;
-    results.stderr += result.stderr;
-    // If there was an error in a command, stop executing the rest of the script.
-    if (result.stderr) {
-      break;
+    let outcome: 'Success' | 'Failure' | 'Blocked' = 'Success';
+    let reason: string | undefined;
+
+    if (!isAllowed(command)) {
+        outcome = 'Blocked';
+        reason = 'Security policy violation: forbidden characters or not whitelisted.';
+        results.stderr += `Blocked: ${command}`;
+    } else {
+        const res = await new Promise<{ stdout: string; stderr: string }>((resolve) => {
+            exec(command, (error, stdout, stderr) => resolve({ stdout, stderr }));
+        });
+        results.stdout += res.stdout;
+        results.stderr += res.stderr;
+        if (res.stderr) outcome = 'Failure';
     }
+
+    // Audit Log
+    db.data.auditLogs.push({
+        id: Math.random().toString(36).substr(2, 9),
+        timestamp: new Date().toISOString(),
+        user: db.data.settings.userName,
+        command,
+        outcome,
+        reason
+    });
+    await db.write();
+
+    if (results.stderr) break;
   }
   return results;
+});
+
+ipcMain.handle('db-get-audit-logs', () => {
+    return db.data.auditLogs.slice(-100).reverse(); // Return last 100 logs
 });
 // --- End Command Execution Handler ---
 
@@ -659,15 +675,20 @@ ipcMain.handle('ai-categorize-prioritize', async (event, { title, description })
             model: "gemini-1.5-flash",
             generationConfig: { responseMimeType: "application/json" }
         });
-        const prompt = `Analyze this IT request. Determine priority (Low, Medium, High) and a short category.
+        const prompt = `Analyze this IT request.
+            1. Determine priority (Low, Medium, High).
+            2. Identify a short category (e.g., VPN, Software, Hardware).
+            3. Analyze user sentiment (Frustrated, Neutral, Positive).
+
             TITLE: ${title}
             DESCRIPTION: ${description}
-            Respond with JSON: { "priority": "Low" | "Medium" | "High", "category": "string" }`;
+
+            Respond with JSON: { "priority": "Low" | "Medium" | "High", "category": "string", "sentiment": "Frustrated" | "Neutral" | "Positive" }`;
         const result = await model.generateContent(prompt);
         return JSON.parse(result.response.text());
     } catch (error) {
         console.error("AI Error:", error);
-        return { priority: 'Medium', category: 'General' };
+        return { priority: 'Medium', category: 'General', sentiment: 'Neutral' };
     }
 });
 
@@ -912,6 +933,7 @@ ipcMain.handle('ai-start-conversation', async (event, { videoBase64, prompt }) =
                     "resolution": "Step-by-step resolution steps",
                     "status": "Resolved",
                     "priority": "Low" | "Medium" | "High",
+                    "sentiment": "Frustrated" | "Neutral" | "Positive",
                     "suggestedScript": ["ls", "df"] // Optional shell commands from whitelist
                 }
             }

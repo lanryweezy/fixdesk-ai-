@@ -27,6 +27,25 @@ const PriorityBadge: React.FC<{ priority: 'Low' | 'Medium' | 'High' }> = ({ prio
     return <span className={`font-medium ${priorityClasses[priority]}`}>{priority}</span>
 }
 
+const SentimentBadge: React.FC<{ sentiment?: 'Frustrated' | 'Neutral' | 'Positive' }> = ({ sentiment }) => {
+    if (!sentiment) return null;
+    const icons = {
+        'Frustrated': '😠',
+        'Neutral': '😐',
+        'Positive': '😊'
+    };
+    const colors = {
+        'Frustrated': 'text-red-500 bg-red-50',
+        'Neutral': 'text-slate-500 bg-slate-50',
+        'Positive': 'text-green-500 bg-green-50'
+    };
+    return (
+        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${colors[sentiment]}`}>
+            {icons[sentiment]} {sentiment.toUpperCase()}
+        </span>
+    );
+};
+
 interface TicketItemProps {
   ticket: Ticket;
   onSelect: (ticket: Ticket) => void;
@@ -44,7 +63,10 @@ const TicketItem: React.FC<TicketItemProps> = ({ ticket, onSelect }) => {
     >
         <div>
             <div className="flex justify-between items-start">
-                <StatusBadge status={ticket.status} />
+                <div className="flex items-center gap-2">
+                    <StatusBadge status={ticket.status} />
+                    <SentimentBadge sentiment={ticket.sentiment} />
+                </div>
                 <span className="text-xs text-slate-400">{date}</span>
             </div>
             <h3 className="font-semibold text-slate-800 mt-2 truncate">{ticket.title}</h3>

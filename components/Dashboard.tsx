@@ -31,6 +31,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
   const [liveMetrics, setLiveMetrics] = React.useState({ cpuUsage: 0, memUsage: 0, diskUsage: 0 });
   const [bundleAnalysis, setBundleAnalysis] = React.useState<{ analysis: string, fileName: string } | null>(null);
   const [isAnalyzingBundle, setIsAnalyzingBundle] = React.useState(false);
+  const [auditLogs, setAuditLogs] = React.useState<any[]>([]);
 
   React.useEffect(() => {
     const fetchMetrics = async () => {
@@ -59,7 +60,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
             setIsLoadingHealth(false);
         }
     };
+    const fetchAuditLogs = async () => {
+        if (role !== 'admin') return;
+        try {
+            const logs = await window.electronAPI.getAuditLogs();
+            setAuditLogs(logs);
+        } catch (e) {}
+    };
+
     fetchHealth();
+    fetchAuditLogs();
   }, [tickets, role]);
 
   const handleAnalyzeBundle = async () => {
@@ -419,9 +429,44 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
         </Card>
 
         {role === 'admin' && (
-            <div className="lg:col-span-5">
-                <ITTerminal />
-            </div>
+            <>
+                <div className="lg:col-span-3">
+                    <ITTerminal />
+                </div>
+                <div className="lg:col-span-2">
+                    <Card className="h-[500px] flex flex-col p-0 overflow-hidden bg-white dark:bg-slate-800">
+                        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">AIOps Audit Log</h3>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                            {auditLogs.length > 0 ? (
+                                <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                                    {auditLogs.map((log) => (
+                                        <div key={log.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <span className="text-[10px] font-mono text-slate-400">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                                    log.outcome === 'Success' ? 'bg-green-100 text-green-700' :
+                                                    log.outcome === 'Blocked' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
+                                                }`}>
+                                                    {log.outcome}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs font-mono text-slate-700 dark:text-slate-200 truncate mb-1">{log.command}</p>
+                                            <p className="text-[10px] text-slate-500">By <span className="font-bold">{log.user}</span></p>
+                                            {log.reason && <p className="text-[10px] text-red-500 italic mt-1">{log.reason}</p>}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-slate-400 text-sm italic">
+                                    No audit history available.
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+                </div>
+            </>
         )}
 
         {role === 'admin' && aiOpsActivities.length > 0 && (

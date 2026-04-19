@@ -99,6 +99,7 @@ const initDatabase = async () => {
         tickets: [],
         solutions: [],
         remoteSessions: [],
+        auditLogs: [],
         settings: {
             role: 'admin',
             isDarkMode: false,
@@ -450,41 +451,50 @@ electron_1.ipcMain.handle('db-generate-mock-data', async () => {
 });
 // --- End Database Handlers ---
 // --- Command Execution Handler ---
-const ALLOWED_COMMANDS = ['ping', 'ifconfig', 'ipconfig', 'netstat', 'ls', 'dir', 'uptime', 'whoami', 'df', 'free'];
+const ALLOWED_COMMANDS = ['ping', 'ifconfig', 'ipconfig', 'netstat', 'ls', 'dir', 'uptime', 'whoami', 'df', 'free', 'ps', 'top', 'pkill', 'systemctl', 'journalctl'];
 electron_1.ipcMain.handle('execute-command', async (event, commands) => {
     const isAllowed = (cmd) => {
-        // 1. Check for command chaining characters
         const forbiddenChars = [';', '&', '|', '>', '<', '`', '$', '(', ')'];
-        if (forbiddenChars.some(char => cmd.includes(char))) {
+        if (forbiddenChars.some(char => cmd.includes(char)))
             return false;
-        }
-        // 2. Check the base command against the whitelist
         const baseCmd = cmd.trim().split(' ')[0].toLowerCase();
         return ALLOWED_COMMANDS.includes(baseCmd);
     };
-    const execPromise = (command) => {
-        if (!isAllowed(command)) {
-            return Promise.resolve({ stdout: '', stderr: `Blocked: Command '${command}' contains forbidden characters or is not in the whitelist.` });
-        }
-        return new Promise((resolve) => {
-            (0, child_process_1.exec)(command, (error, stdout, stderr) => {
-                // We resolve even if there's an error, but we include the stderr.
-                // The renderer process will be responsible for checking the stderr property.
-                resolve({ stdout, stderr });
-            });
-        });
-    };
     const results = { stdout: '', stderr: '' };
     for (const command of commands) {
-        const result = await execPromise(command);
-        results.stdout += result.stdout;
-        results.stderr += result.stderr;
-        // If there was an error in a command, stop executing the rest of the script.
-        if (result.stderr) {
-            break;
+        let outcome = 'Success';
+        let reason;
+        if (!isAllowed(command)) {
+            outcome = 'Blocked';
+            reason = 'Security policy violation: forbidden characters or not whitelisted.';
+            results.stderr += `Blocked: ${command}`;
         }
+        else {
+            const res = await new Promise((resolve) => {
+                (0, child_process_1.exec)(command, (error, stdout, stderr) => resolve({ stdout, stderr }));
+            });
+            results.stdout += res.stdout;
+            results.stderr += res.stderr;
+            if (res.stderr)
+                outcome = 'Failure';
+        }
+        // Audit Log
+        db.data.auditLogs.push({
+            id: Math.random().toString(36).substr(2, 9),
+            timestamp: new Date().toISOString(),
+            user: db.data.settings.userName,
+            command,
+            outcome,
+            reason
+        });
+        await db.write();
+        if (results.stderr)
+            break;
     }
     return results;
+});
+electron_1.ipcMain.handle('db-get-audit-logs', () => {
+    return db.data.auditLogs.slice(-100).reverse(); // Return last 100 logs
 });
 // --- End Command Execution Handler ---
 // --- Gemini AI Handlers ---
@@ -499,13 +509,19 @@ const startMonitoring = () => {
             const mem = await systeminformation_1.default.mem();
             const cpu = await systeminformation_1.default.currentLoad();
             const disk = await systeminformation_1.default.fsSize();
+            const processes = await systeminformation_1.default.processes();
             const memUsage = (mem.active / mem.total) * 100;
             const cpuUsage = cpu.currentLoad;
             const diskUsage = disk[0]?.use || 0;
-            // Thresholds for autonomous action
+            // Top 5 processes by CPU
+            const topProcesses = processes.list
+                .sort((a, b) => b.cpu - a.cpu)
+                .slice(0, 5)
+                .map(p => ({ name: p.name, cpu: p.cpu, mem: p.mem, pid: p.pid }));
+            // Thresholds for autonomous action (lowered for demo purposes if needed, but keeping 90 for logic)
             if (memUsage > 90 || cpuUsage > 90 || diskUsage > 90) {
                 console.log(`[AIOps] Critical metrics detected: CPU ${cpuUsage.toFixed(1)}%, Mem ${memUsage.toFixed(1)}%, Disk ${diskUsage.toFixed(1)}%`);
-                await triggerAutonomousResolution({ cpuUsage, memUsage, diskUsage });
+                await triggerAutonomousResolution({ cpuUsage, memUsage, diskUsage, topProcesses });
             }
         }
         catch (error) {
@@ -523,8 +539,13 @@ const triggerAutonomousResolution = async (metrics) => {
             Memory: ${metrics.memUsage.toFixed(1)}%
             Disk: ${metrics.diskUsage.toFixed(1)}%
 
-            1. Diagnose the likely issue.
-            2. Suggest a safe, automated shell command to mitigate it (e.g., clearing temp files if disk is high, or identifying a runaway process).
+            TOP PROCESSES:
+            ${JSON.stringify(metrics.topProcesses)}
+
+            1. Diagnose the likely issue using the metrics and top processes.
+            2. Suggest a safe, automated shell command to mitigate it.
+               ALLOWED COMMANDS: ping, ifconfig, ipconfig, netstat, ls, dir, uptime, whoami, df, free, ps, top, pkill, systemctl, journalctl.
+               Example: If a process 'bad_app' is consuming 90% CPU, suggest 'pkill bad_app'.
             3. Provide a ticket title and description.
 
             Respond with ONLY a JSON object:
@@ -607,16 +628,21 @@ electron_1.ipcMain.handle('ai-categorize-prioritize', async (event, { title, des
             model: "gemini-1.5-flash",
             generationConfig: { responseMimeType: "application/json" }
         });
-        const prompt = `Analyze this IT request. Determine priority (Low, Medium, High) and a short category.
+        const prompt = `Analyze this IT request.
+            1. Determine priority (Low, Medium, High).
+            2. Identify a short category (e.g., VPN, Software, Hardware).
+            3. Analyze user sentiment (Frustrated, Neutral, Positive).
+
             TITLE: ${title}
             DESCRIPTION: ${description}
-            Respond with JSON: { "priority": "Low" | "Medium" | "High", "category": "string" }`;
+
+            Respond with JSON: { "priority": "Low" | "Medium" | "High", "category": "string", "sentiment": "Frustrated" | "Neutral" | "Positive" }`;
         const result = await model.generateContent(prompt);
         return JSON.parse(result.response.text());
     }
     catch (error) {
         console.error("AI Error:", error);
-        return { priority: 'Medium', category: 'General' };
+        return { priority: 'Medium', category: 'General', sentiment: 'Neutral' };
     }
 });
 electron_1.ipcMain.handle('ai-chat', async (event, { message, history, screenshot }) => {
@@ -650,8 +676,6 @@ electron_1.ipcMain.handle('ai-chat', async (event, { message, history, screensho
 });
 electron_1.ipcMain.handle('ai-ask-about-ticket', async (event, { ticket, question }) => {
     try {
-        if (!process.env.GEMINI_API_KEY)
-            throw new Error('API key missing');
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `You are an IT support assistant. Answer the user question about this ticket.
 
@@ -677,8 +701,6 @@ electron_1.ipcMain.handle('ai-ask-about-ticket', async (event, { ticket, questio
 });
 electron_1.ipcMain.handle('ai-draft-response', async (event, ticket) => {
     try {
-        if (!process.env.GEMINI_API_KEY)
-            throw new Error('API key missing');
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `Draft a professional response for this ticket: ${JSON.stringify(ticket)}`;
         const result = await model.generateContent(prompt);
@@ -860,6 +882,7 @@ electron_1.ipcMain.handle('ai-start-conversation', async (event, { videoBase64, 
                     "resolution": "Step-by-step resolution steps",
                     "status": "Resolved",
                     "priority": "Low" | "Medium" | "High",
+                    "sentiment": "Frustrated" | "Neutral" | "Positive",
                     "suggestedScript": ["ls", "df"] // Optional shell commands from whitelist
                 }
             }

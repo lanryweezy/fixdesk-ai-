@@ -30,6 +30,7 @@ export interface Ticket {
   videoUrl?: string; // a mock url
   logs?: string[];
   priority: 'Low' | 'Medium' | 'High';
+  sentiment?: 'Frustrated' | 'Neutral' | 'Positive';
   activities?: Activity[];
   attachments?: { name: string; url: string }[];
 }

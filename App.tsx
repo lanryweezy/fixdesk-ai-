@@ -93,13 +93,14 @@ export default function App() {
         id: Math.random().toString(36).substr(2, 9),
         timestamp: new Date().toISOString(),
         type: 'note',
-        message: `Ticket created and auto-categorized as ${aiInsight.category} with ${aiInsight.priority} priority.`,
+        message: `Ticket created and auto-categorized as ${aiInsight.category} with ${aiInsight.priority} priority. Sentiment detected: ${aiInsight.sentiment || 'Neutral'}.`,
         user: 'FixDesk AI'
     };
 
     const ticket: Ticket = {
       ...newTicket,
       priority: aiInsight.priority,
+      sentiment: aiInsight.sentiment || (newTicket as any).sentiment,
       title: `${aiInsight.category}: ${newTicket.title}`,
       id: `TICK-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
       createdAt: new Date().toISOString(),
