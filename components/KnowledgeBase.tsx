@@ -29,6 +29,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ role = 'admin', on
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newProblem, setNewProblem] = useState('');
   const [newSolution, setNewSolution] = useState('');
+  const [newActions, setNewActions] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -53,7 +54,8 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ role = 'admin', on
         const solutionData = {
             problemDescription: newProblem,
             solutionDescription: newSolution,
-            actions: [] // Manual entry has no recorded actions
+            actions: [], // Manual entry has no recorded actions
+            executableActions: newActions.split('\n').map(s => s.trim()).filter(Boolean)
         };
         const created = await window.electronAPI.createSolution(solutionData);
         setSolutions(prev => [created, ...prev]);
@@ -167,6 +169,16 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ role = 'admin', on
                             rows={4}
                             placeholder="Describe the steps to fix this problem..."
                             className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-primary outline-none transition-all resize-none"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1">Executable Actions (One per line)</label>
+                        <textarea
+                            value={newActions}
+                            onChange={(e) => setNewActions(e.target.value)}
+                            rows={2}
+                            placeholder="e.g., uptime"
+                            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-primary outline-none transition-all font-mono text-xs"
                         />
                     </div>
                 </div>

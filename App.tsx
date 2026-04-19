@@ -9,6 +9,7 @@ import { TicketDetail } from './components/TicketDetail';
 import { KnowledgeBase } from './components/KnowledgeBase';
 import { Settings } from './components/Settings';
 import { ReportIssueModal } from './components/ReportIssueModal';
+import { GlobalAssistant } from './components/GlobalAssistant';
 import { RemoteControlView } from './components/RemoteControlView';
 import { StartRemoteSession } from './components/StartRemoteSession';
 import { Card } from './components/common/Card';
@@ -179,13 +180,50 @@ export default function App() {
                     Back to Knowledge Base
                 </button>
                 <Card className="p-8">
-                    <div className="flex items-center gap-3 mb-6">
-                        <BrainCircuit className="w-8 h-8 text-brand-primary" />
-                        <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100">{selectedSolution.problemDescription}</h2>
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <BrainCircuit className="w-8 h-8 text-brand-primary" />
+                            <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100">{selectedSolution.problemDescription}</h2>
+                        </div>
                     </div>
                     <div className="prose dark:prose-invert max-w-none prose-indigo">
                         <ReactMarkdown>{selectedSolution.solutionDescription}</ReactMarkdown>
                     </div>
+
+                    {selectedSolution.executableActions && selectedSolution.executableActions.length > 0 && (
+                        <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800">
+                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Quick Resolve Actions</h3>
+                            <div className="grid grid-cols-1 gap-3">
+                                {selectedSolution.executableActions.map((cmd, idx) => (
+                                    <button
+                                        key={idx}
+                                        onClick={async () => {
+                                            try {
+                                                const { stdout, stderr } = await window.electronAPI.executeCommand([cmd]);
+                                                if (stderr) addToast(`Error: ${stderr}`, 'error');
+                                                else addToast(`Success: ${stdout || 'Command executed'}`, 'success');
+                                            } catch (e) {
+                                                addToast('Failed to execute command', 'error');
+                                            }
+                                        }}
+                                        className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-brand-primary transition-all group"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-brand-primary/10 rounded-lg group-hover:bg-brand-primary group-hover:text-white transition-colors">
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
+                                                </svg>
+                                            </div>
+                                            <span className="font-mono text-xs text-slate-600 dark:text-slate-300">Run: <span className="font-bold">{cmd}</span></span>
+                                        </div>
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-slate-400 group-hover:text-brand-primary group-hover:translate-x-1 transition-all">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                                        </svg>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </Card>
             </div>
         );
@@ -333,6 +371,7 @@ export default function App() {
           {renderPage()}
         </main>
       </div>
+      <GlobalAssistant />
       {isModalOpen && <ReportIssueModal onClose={() => setIsModalOpen(false)} onTicketCreated={handleCreateTicket} />}
     </div>
   );

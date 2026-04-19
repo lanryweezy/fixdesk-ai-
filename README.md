@@ -9,6 +9,8 @@ Built with React, TypeScript, and Electron, FixDesk AI combines the power of web
 ## Features
 
 - 🤖 **AI-Powered Support**: Leverages Google Gemini AI for intelligent responses
+- 💬 **Global AI Assistant**: A floating widget available on every screen for instant troubleshooting and IT guidance.
+- 🐚 **Secure IT Terminal**: A whitelisted, security-hardened terminal for admins to execute diagnostic commands (`ping`, `netstat`, etc.).
 - 💻 **Cross-Platform Desktop App**: Built with Electron for Windows, macOS, and Linux
 - ⚛️ **Modern Stack**: React + TypeScript for robust, type-safe development
 - ⚡ **Fast Development**: Vite-powered build system for instant HMR
@@ -85,7 +87,16 @@ npm run electron:dev
 1. **Launch the Application**: Start the app using `npm run dev` or the built Electron app
 2. **AI Studio Integration**: Access your app through AI Studio at: [https://ai.studio/apps/drive/1XJ7hnLjKijLsWgInn1y-1ReX6jhUq4-a](https://ai.studio/apps/drive/1XJ7hnLjKijLsWgInn1y-1ReX6jhUq4-a)
 3. **Interact with AI**: Use the interface to ask questions and receive AI-powered support
-4. **Customize**: Modify components and services to fit your specific help desk needs
+4. **Admin Tools**: Switch to "Admin Mode" in the sidebar to access the **Secure IT Terminal** on the Dashboard.
+5. **Customize**: Modify components and services to fit your specific help desk needs
+
+### Secure IT Terminal
+The terminal is restricted to authorized admins and supports a curated whitelist of commands for safe diagnostics:
+- **Network**: `ping`, `netstat`, `ifconfig`, `ipconfig`
+- **System**: `uptime`, `whoami`, `df`, `free`
+- **Navigation**: `ls`, `dir`
+
+Security is enforced via character-based injection protection (blocking `;`, `&`, `|`, etc.) and strict command validation in the Electron main process.
 
 ## Project Structure
 

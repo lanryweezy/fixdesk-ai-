@@ -9,6 +9,7 @@ export interface ElectronApi {
       updateTicket: (ticket: Ticket) => Promise<Ticket>;
     getTicketById: (id: string) => Promise<Ticket | undefined>;
     executeCommand: (commands: string[]) => Promise<{ stdout: string; stderr: string }>;
+    getSystemMetrics: () => Promise<{ cpuUsage: number; memUsage: number; diskUsage: number }>;
     getSolutions: () => Promise<Solution[]>;
     createSolution: (solution: Omit<Solution, 'id'>) => Promise<Solution>;
     findSolutions: (problemDescription: string) => Promise<Solution[]>;
@@ -20,6 +21,7 @@ export interface ElectronApi {
     generateMockData: () => Promise<boolean>;
     exportSupportBundle: () => Promise<boolean>;
     getSystemDiagnostics: () => Promise<any>;
+    aiChat: (message: string, history: any[]) => Promise<string>;
     categorizeAndPrioritize: (title: string, description: string) => Promise<{ priority: 'Low' | 'Medium' | 'High', category: string }>;
     askAboutTicket: (ticket: Ticket, question: string) => Promise<string>;
     draftAiResponse: (ticket: Ticket) => Promise<string>;

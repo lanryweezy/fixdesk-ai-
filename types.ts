@@ -45,6 +45,7 @@ export interface Solution {
   problemDescription: string;
   solutionDescription: string;
   actions: RecordedAction[];
+  executableActions?: string[]; // New: whitelisted shell commands
 }
 
 export interface AnalyticsData {

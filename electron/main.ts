@@ -622,6 +622,25 @@ ipcMain.handle('ai-categorize-prioritize', async (event, { title, description })
     }
 });
 
+ipcMain.handle('ai-chat', async (event, { message, history }) => {
+    try {
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            systemInstruction: "You are a helpful IT Support Assistant for FixDesk AI. Your goal is to help employees solve technical issues. Be professional, concise, and friendly. If you cannot solve something, suggest they report an issue."
+        } as any);
+
+        const chat = model.startChat({
+            history: history || [],
+        });
+
+        const result = await chat.sendMessage(message);
+        return result.response.text();
+    } catch (error: any) {
+        console.error("AI Chat Error:", error);
+        return `AI Error: ${error.message || "Unknown error occurred."}`;
+    }
+});
+
 ipcMain.handle('ai-ask-about-ticket', async (event, { ticket, question }) => {
     try {
         if (!process.env.GEMINI_API_KEY) throw new Error('API key missing');
@@ -691,6 +710,23 @@ ipcMain.handle('get-system-diagnostics', async () => {
     } catch (error) {
         console.error('Diagnostic error:', error);
         return { error: 'Failed to gather diagnostics' };
+    }
+});
+
+ipcMain.handle('get-system-metrics', async () => {
+    try {
+        const cpu = await si.currentLoad();
+        const mem = await si.mem();
+        const disk = await si.fsSize();
+
+        return {
+            cpuUsage: Math.round(cpu.currentLoad),
+            memUsage: Math.round((mem.active / mem.total) * 100),
+            diskUsage: Math.round(disk[0]?.use || 0)
+        };
+    } catch (error) {
+        console.error('Metrics error:', error);
+        return { cpuUsage: 0, memUsage: 0, diskUsage: 0 };
     }
 });
 

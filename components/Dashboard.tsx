@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Card } from './common/Card';
 import { mockAnalyticsData } from '../constants';
 import { Ticket, TicketStatus, Activity } from '../types';
+import { ITTerminal } from './ITTerminal';
 import { ChatBubbleBottomCenterTextIcon, BrainCircuit, ShieldCheckIcon, SpinnerIcon } from './icons/Icons';
 
 const PIE_COLORS = { 'FixDesk AI': '#4F46E5', 'IT Support Team': '#A78BFA' };
@@ -358,6 +359,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
             </PieChart>
           </ResponsiveContainer>
         </Card>
+
+        {role === 'admin' && (
+            <div className="lg:col-span-5">
+                <ITTerminal />
+            </div>
+        )}
 
         {role === 'admin' && allActivities.length > 0 && (
             <Card className="lg:col-span-5">
