@@ -488,6 +488,15 @@ ipcMain.handle('db-generate-mock-data', async () => {
 // --- Command Execution Handler ---
 const ALLOWED_COMMANDS = ['ping', 'ifconfig', 'ipconfig', 'netstat', 'ls', 'dir', 'uptime', 'whoami', 'df', 'free', 'ps', 'top', 'pkill', 'systemctl', 'journalctl'];
 
+const scrubPII = (text: string): string => {
+    if (!text) return text;
+    // Basic scrubbing for emails, IPs, and common potential secret patterns
+    let scrubbed = text.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[EMAIL_REDACTED]');
+    scrubbed = scrubbed.replace(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, '[IP_REDACTED]');
+    scrubbed = scrubbed.replace(/(password|secret|key|token|auth)=["']?[^"'\s]+["']?/gi, '$1=[REDACTED]');
+    return scrubbed;
+};
+
 ipcMain.handle('execute-command', async (event, commands: string[]) => {
   const isAllowed = (cmd: string) => {
     const forbiddenChars = [';', '&', '|', '>', '<', '`', '$', '(', ')'];
@@ -509,8 +518,8 @@ ipcMain.handle('execute-command', async (event, commands: string[]) => {
         const res = await new Promise<{ stdout: string; stderr: string }>((resolve) => {
             exec(command, (error, stdout, stderr) => resolve({ stdout, stderr }));
         });
-        results.stdout += res.stdout;
-        results.stderr += res.stderr;
+        results.stdout += scrubPII(res.stdout);
+        results.stderr += scrubPII(res.stderr);
         if (res.stderr) outcome = 'Failure';
     }
 
@@ -519,7 +528,7 @@ ipcMain.handle('execute-command', async (event, commands: string[]) => {
         id: Math.random().toString(36).substr(2, 9),
         timestamp: new Date().toISOString(),
         user: db.data.settings.userName,
-        command,
+        command: scrubPII(command),
         outcome,
         reason
     });
@@ -532,6 +541,30 @@ ipcMain.handle('execute-command', async (event, commands: string[]) => {
 
 ipcMain.handle('db-get-audit-logs', () => {
     return db.data.auditLogs.slice(-100).reverse(); // Return last 100 logs
+});
+
+ipcMain.handle('export-audit-report', async () => {
+    const { filePath } = await dialog.showSaveDialog({
+        title: 'Export SOC2 Audit Report',
+        defaultPath: path.join(app.getPath('downloads'), `soc2-audit-${new Date().toISOString().split('T')[0]}.json`),
+        filters: [{ name: 'JSON', extensions: ['json'] }]
+    });
+
+    if (filePath) {
+        const report = {
+            exportedAt: new Date().toISOString(),
+            exportedBy: db.data.settings.userName,
+            workspaceId: db.data.settings.activeWorkspaceId,
+            auditLogs: db.data.auditLogs,
+            policies: {
+                aiOpsMode: db.data.settings.aiOpsPolicy,
+                commandWhitelist: ALLOWED_COMMANDS
+            }
+        };
+        fs.writeFileSync(filePath, JSON.stringify(report, null, 2));
+        return true;
+    }
+    return false;
 });
 // --- End Command Execution Handler ---
 

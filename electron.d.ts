@@ -20,6 +20,7 @@ export interface ElectronApi {
     updateSettings: (settings: Partial<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string, aiOpsPolicy: string, autoLaunch: boolean, geminiApiKey?: string }>) => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string, aiOpsPolicy: string, autoLaunch: boolean, geminiApiKey?: string }>;
     generateMockData: () => Promise<boolean>;
     exportSupportBundle: () => Promise<boolean>;
+    exportAuditReport: () => Promise<boolean>;
     getAuditLogs: () => Promise<any[]>;
     getSystemDiagnostics: () => Promise<any>;
     aiChat: (message: string, history: any[], screenshot?: string) => Promise<string>;

@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateSettings: (settings: any) => ipcRenderer.invoke('db-update-settings', settings),
   generateMockData: () => ipcRenderer.invoke('db-generate-mock-data'),
   exportSupportBundle: () => ipcRenderer.invoke('export-support-bundle'),
+  exportAuditReport: () => ipcRenderer.invoke('export-audit-report'),
   getAuditLogs: () => ipcRenderer.invoke('db-get-audit-logs'),
   getSystemDiagnostics: () => ipcRenderer.invoke('get-system-diagnostics'),
 

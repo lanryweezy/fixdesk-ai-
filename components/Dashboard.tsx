@@ -6,14 +6,24 @@ import { Ticket, TicketStatus, Activity } from '../types';
 import { ITTerminal } from './ITTerminal';
 import ReactMarkdown from 'react-markdown';
 import { ChatBubbleBottomCenterTextIcon, BrainCircuit, ShieldCheckIcon, SpinnerIcon, CloudArrowDownIcon, DocumentTextIcon, XMarkIcon } from './icons/Icons';
+import { useToast } from '../services/ToastContext';
 
 const PIE_COLORS = { 'FixDesk AI': '#4F46E5', 'IT Support Team': '#A78BFA' };
 
-const StatCard: React.FC<{ title: string; value: string | number; subtext: string }> = ({ title, value, subtext }) => (
-  <Card>
-    <h3 className="text-sm font-medium text-slate-500">{title}</h3>
-    <p className="text-3xl font-bold text-slate-800 dark:text-slate-100 mt-2">{value}</p>
-    <p className="text-sm text-slate-400 mt-1">{subtext}</p>
+const StatCard: React.FC<{ title: string; value: string | number; subtext: string; icon?: React.ReactNode }> = ({ title, value, subtext, icon }) => (
+  <Card className="relative overflow-hidden group hover:shadow-2xl hover:shadow-brand-primary/10 transition-all duration-300 ring-1 ring-slate-200 dark:ring-slate-800">
+    <div className="relative z-10">
+        <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">{title}</h3>
+            {icon && <div className="text-brand-primary opacity-20 group-hover:opacity-100 transition-opacity">{icon}</div>}
+        </div>
+        <p className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{value}</p>
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-2 flex items-center gap-1">
+            <span className="w-1 h-1 rounded-full bg-brand-primary"></span>
+            {subtext}
+        </p>
+    </div>
+    <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-brand-primary/5 rounded-full blur-2xl group-hover:bg-brand-primary/10 transition-colors"></div>
   </Card>
 );
 
@@ -24,6 +34,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', onFilterTickets }) => {
+  const { addToast } = useToast();
   const analytics = mockAnalyticsData;
   const [systemHealth, setSystemHealth] = React.useState<{ status: string, summary: string, risks: string[] } | null>(null);
   const [isLoadingHealth, setIsLoadingHealth] = React.useState(false);
@@ -188,12 +199,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
     return { priorityCounts, statusCounts };
   }, [filteredTickets]);
 
+  const selfHealedTickets = useMemo(() => {
+    return tickets.filter(t => t.status === TicketStatus.SELF_HEALED);
+  }, [tickets]);
+
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-start">
-        <div className="space-y-1">
+    <div className="space-y-10 animate-in fade-in duration-500">
+      <div className="flex justify-between items-end">
+        <div className="space-y-3">
             <div className="flex items-center gap-4">
-                <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Analytics & IT Insights</h2>
+                <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">Analytics <span className="text-brand-primary">&</span> Insights</h2>
                 {role === 'admin' && (
                     <button
                         onClick={handleAnalyzeBundle}
@@ -218,15 +233,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
                 </div>
             </div>
         </div>
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 h-fit">
+        <div className="flex bg-white dark:bg-slate-800 p-1 rounded-xl shadow-sm ring-1 ring-slate-200 dark:ring-slate-700 h-fit">
             {(['24h', '7d', '30d'] as const).map(range => (
                 <button
                     key={range}
                     onClick={() => setDateRange(range)}
-                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
+                    className={`px-5 py-2 text-xs font-black rounded-lg transition-all ${
                         dateRange === range
-                        ? 'bg-white dark:bg-slate-700 text-brand-primary shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-lg'
+                        : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                     }`}
                 >
                     {range.toUpperCase()}
@@ -307,11 +322,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Total Tickets" value={stats.total} subtext="All-time ticket count" />
-        <StatCard title="Tickets Resolved" value={stats.resolvedCount} subtext="Total resolved tickets" />
-        <StatCard title="Automation Rate" value={`${stats.autoRate}%`} subtext="Resolved by FixDesk AI" />
-        <StatCard title="Avg. Resolution Time" value={`${stats.avgResHours}h`} subtext="From creation to resolution" />
+        <StatCard title="Total Volume" value={stats.total} subtext="Active tickets in period" icon={<DocumentTextIcon className="w-5 h-5" />} />
+        <StatCard title="Resolved" value={stats.resolvedCount} subtext="Successful closures" icon={<ShieldCheckIcon className="w-5 h-5" />} />
+        <StatCard title="AI Autonomy" value={`${stats.autoRate}%`} subtext="No human intervention" icon={<BrainCircuit className="w-5 h-5" />} />
+        <StatCard title="Mean Time (MTTR)" value={`${stats.avgResHours}h`} subtext="Average resolution speed" icon={<ChatBubbleBottomCenterTextIcon className="w-5 h-5" />} />
       </div>
+
+      {role === 'admin' && selfHealedTickets.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-left duration-700">
+                <Card className="md:col-span-3 border-l-4 border-l-emerald-500 bg-emerald-50/30 dark:bg-emerald-500/5 overflow-hidden">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-6 p-2">
+                        <div className="flex items-center gap-6">
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-emerald-500 blur-xl opacity-20 rounded-full animate-pulse"></div>
+                                <div className="relative w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                                    <ShieldCheckIcon className="w-8 h-8" />
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black text-slate-800 dark:text-white tracking-tight">Autonomous Healing Active</h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                                    FixDesk AI has successfully self-remediated <span className="text-emerald-600 dark:text-emerald-400 font-bold">{selfHealedTickets.length} critical anomalies</span> in this workspace.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            {selfHealedTickets.slice(0, 3).map((t, i) => (
+                                <div key={i} className="hidden lg:flex flex-col p-3 bg-white dark:bg-slate-800 rounded-xl border border-emerald-100 dark:border-emerald-900/30 shadow-sm">
+                                    <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase">Self-Healed</span>
+                                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate w-32">{t.title.replace('[Self-Healing] ', '')}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </Card>
+          </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <Card className="lg:col-span-2">
@@ -437,6 +483,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
                     <Card className="h-[500px] flex flex-col p-0 overflow-hidden bg-white dark:bg-slate-800">
                         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
                             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">AIOps Audit Log</h3>
+                            <button
+                                onClick={async () => {
+                                    const success = await window.electronAPI.exportAuditReport();
+                                    if (success) addToast('SOC2 Audit Report exported', 'success');
+                                }}
+                                className="text-[10px] font-bold text-brand-primary hover:underline"
+                            >
+                                Export Report
+                            </button>
                         </div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
                             {auditLogs.length > 0 ? (

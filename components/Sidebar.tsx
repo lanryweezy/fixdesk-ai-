@@ -31,23 +31,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
   const staffActiveCount = tickets.filter(t => t.reportedBy === userName && t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.AI_RESOLVED).length;
 
   return (
-    <div className="w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col p-4">
-      <div className="flex items-center gap-2 px-2 mb-8">
-        <BrainCircuit className="h-8 w-8 text-brand-primary" />
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">FixDesk AI</h1>
+    <div className="w-64 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col p-5">
+      <div className="flex items-center gap-3 px-2 mb-10">
+        <div className="p-1.5 bg-brand-primary rounded-xl shadow-lg shadow-brand-primary/20">
+            <BrainCircuit className="h-6 w-6 text-white" />
+        </div>
+        <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">FixDesk <span className="text-brand-primary">AI</span></h1>
       </div>
       
       <nav className="flex-1 flex flex-col justify-between">
         <div>
           <button
             onClick={onReportIssue}
-            className="w-full flex items-center justify-center gap-2 bg-brand-primary hover:bg-brand-primary/90 text-white font-semibold py-3 px-4 rounded-lg shadow-md transition-all duration-200 transform hover:scale-105"
+            className="w-full flex items-center justify-center gap-2 bg-brand-primary hover:bg-brand-secondary text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-brand-primary/25 transition-all duration-300 active:scale-95"
           >
             <ComputerDesktopIcon className="w-5 h-5" />
             Report an Issue
           </button>
           
-          <ul className="mt-8 space-y-2">
+          <ul className="mt-10 space-y-1">
             {navItems.filter(item => item.roles.includes(role)).map((item) => (
               <li key={item.name}>
                 <a
@@ -56,17 +58,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
                     e.preventDefault();
                     setPage(item.page as Page);
                   }}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-base font-medium transition-colors ${
+                  className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     currentPage === item.page
-                      ? 'bg-brand-primary/10 text-brand-primary'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                      ? 'bg-white dark:bg-slate-800 text-brand-primary shadow-sm ring-1 ring-slate-200 dark:ring-slate-700'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                 >
-                  <item.icon className="w-6 h-6" />
+                  <item.icon className={`w-5 h-5 transition-colors ${currentPage === item.page ? 'text-brand-primary' : 'text-slate-400 group-hover:text-slate-600'}`} />
                   <span className="flex-1">{item.name}</span>
                   {item.page === 'tickets' && (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        currentPage === 'tickets' ? 'bg-brand-primary text-white' : 'bg-slate-200 text-slate-600'
+                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black ${
+                        currentPage === 'tickets' ? 'bg-brand-primary text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
                     }`}>
                         {role === 'admin' ? unassignedCount : staffActiveCount}
                     </span>
@@ -77,9 +79,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
           </ul>
 
           {role === 'admin' && (
-            <div className="mt-8">
-                <p className="px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Admin Tools</p>
-                <ul className="mt-2 space-y-2">
+            <div className="mt-10">
+                <p className="px-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-4">Systems Admin</p>
+                <ul className="space-y-1">
                     {adminNavItems.map((item) => (
                         <li key={item.name}>
                         <a
@@ -88,13 +90,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
                             e.preventDefault();
                             setPage(item.page as Page);
                         }}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-base font-medium transition-colors ${
+                        className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                             currentPage === item.page
-                            ? 'bg-brand-primary/10 text-brand-primary'
-                            : 'text-slate-600 hover:bg-slate-100'
+                            ? 'bg-white dark:bg-slate-800 text-brand-primary shadow-sm ring-1 ring-slate-200 dark:ring-slate-700'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                         }`}
                         >
-                        <item.icon className="w-6 h-6" />
+                        <item.icon className={`w-5 h-5 transition-colors ${currentPage === item.page ? 'text-brand-primary' : 'text-slate-400 group-hover:text-slate-600'}`} />
                         {item.name}
                         </a>
                     </li>
@@ -104,21 +106,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
           )}
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
             <button
                 onClick={onRoleToggle}
-                className="w-full flex items-center justify-between px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg transition-colors group"
+                className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-brand-primary transition-all group"
             >
                 <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${role === 'admin' ? 'bg-red-500' : 'bg-green-500'}`}></div>
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200 capitalize">{role} Mode</span>
+                    <div className={`w-2 h-2 rounded-full animate-pulse ${role === 'admin' ? 'bg-indigo-500' : 'bg-emerald-500'}`}></div>
+                    <span className="text-xs font-bold text-slate-600 dark:text-slate-200 uppercase tracking-widest">{role} Mode</span>
                 </div>
-                <span className="text-xs text-slate-400 group-hover:text-brand-primary">Switch</span>
+                <span className="text-[10px] font-black text-slate-400 group-hover:text-brand-primary uppercase">Switch</span>
             </button>
 
-            <div className="p-4 bg-slate-100 dark:bg-slate-700 rounded-lg text-center">
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Having trouble? Our AI is here to help you get back on track, fast.
+            <div className="p-5 bg-gradient-to-br from-brand-primary to-brand-secondary rounded-2xl text-white shadow-xl shadow-brand-primary/20">
+                <p className="text-xs font-bold opacity-90 leading-relaxed">
+                    FixDesk AI is actively monitoring your workspace for anomalies.
                 </p>
             </div>
         </div>
