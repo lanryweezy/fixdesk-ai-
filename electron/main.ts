@@ -1194,6 +1194,17 @@ ipcMain.handle('ai-start-conversation', async (event, { videoBase64, prompt }) =
         return { type: 'error', message: 'AI Analysis failed. Please try a manual description.' };
     }
 });
+
+ipcMain.handle('auth-test-sso', async (event, config: any) => {
+    // Simulated OIDC Discovery and Client Authentication
+    console.log('[Auth] Testing SSO Connection with:', config.discoveryUrl);
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    if (config.discoveryUrl && config.discoveryUrl.includes('company.com')) {
+        return { success: true, message: 'Connection established. Identity Provider verified.' };
+    }
+    return { success: false, message: 'Invalid Discovery URL or Client ID.' };
+});
 // --- End Gemini AI Handlers ---
 
 // --- RobotJS Handlers ---

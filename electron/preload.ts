@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   semanticSearchKb: (query: string, solutions: any[]) => ipcRenderer.invoke('ai-semantic-search-kb', { query, solutions }),
   analyzeSupportBundle: () => ipcRenderer.invoke('ai-analyze-support-bundle'),
   startConversation: (videoBase64: string, prompt: string) => ipcRenderer.invoke('ai-start-conversation', { videoBase64, prompt }),
+  testSSO: (config: any) => ipcRenderer.invoke('auth-test-sso', config),
 
   // Event Listeners
   onAIOpsNotification: (callback: any) => ipcRenderer.on('aiops-notification', (_event, data) => callback(data)),
