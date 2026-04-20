@@ -25,6 +25,7 @@ export const AutomationRules: React.FC = () => {
     const [description, setDescription] = useState('');
     const [trigger, setTrigger] = useState<AutomationTrigger>('TICKET_CREATED');
     const [conditions, setConditions] = useState<{ field: string, operator: any, value: string }[]>([]);
+    const [actions, setActions] = useState<{ type: AutomationAction, params: any }[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
@@ -102,7 +103,7 @@ export const AutomationRules: React.FC = () => {
                         value: isNumeric ? Number(c.value) : c.value
                     };
                 }),
-                actions: [
+                actions: actions.length > 0 ? actions : [
                     { type: 'POST_NOTE', params: { message: `AI: Automation rule "${name}" triggered.` } }
                 ]
             };
@@ -347,14 +348,100 @@ export const AutomationRules: React.FC = () => {
                                 ))}
                             </div>
 
-                            <div className="p-4 bg-indigo-50 dark:bg-brand-primary/10 border border-brand-primary/20 rounded-2xl flex items-start gap-4">
-                                <ShieldCheckIcon className="w-5 h-5 text-brand-primary mt-0.5" />
-                                <div className="space-y-1">
-                                    <p className="text-xs font-bold text-brand-primary uppercase tracking-wider">Default Action</p>
-                                    <p className="text-[10px] text-indigo-700 dark:text-indigo-300 leading-relaxed">
-                                        For this version, a status note will be automatically posted when the rule triggers. Advanced conditional logic can be configured in the JSON schema.
-                                    </p>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Automation Actions</label>
+                                    <button
+                                        onClick={() => setActions([...actions, { type: 'POST_NOTE', params: { message: '' } }])}
+                                        className="text-[10px] font-black text-brand-primary uppercase hover:underline"
+                                    >
+                                        + Add Action
+                                    </button>
                                 </div>
+                                {actions.map((action, idx) => (
+                                    <div key={idx} className="space-y-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                                        <div className="flex gap-2 items-center">
+                                            <select
+                                                value={action.type}
+                                                onChange={(e) => {
+                                                    const newActions = [...actions];
+                                                    newActions[idx].type = e.target.value as AutomationAction;
+                                                    // Reset params based on type
+                                                    if (newActions[idx].type === 'SET_PRIORITY') newActions[idx].params = { priority: 'Medium' };
+                                                    else if (newActions[idx].type === 'POST_NOTE') newActions[idx].params = { message: '' };
+                                                    else if (newActions[idx].type === 'EXECUTE_SHELL') newActions[idx].params = { command: '' };
+                                                    else if (newActions[idx].type === 'ASSIGN_TICKET') newActions[idx].params = { assignee: '' };
+                                                    setActions(newActions);
+                                                }}
+                                                className="flex-1 px-2 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold"
+                                            >
+                                                <option value="POST_NOTE">Post Internal Note</option>
+                                                <option value="SET_PRIORITY">Set Priority</option>
+                                                <option value="EXECUTE_SHELL">Execute Whitelisted Command</option>
+                                                <option value="ASSIGN_TICKET">Assign Ticket</option>
+                                                <option value="RESOLVE_TICKET">Resolve Ticket</option>
+                                            </select>
+                                            <button
+                                                onClick={() => setActions(actions.filter((_, i) => i !== idx))}
+                                                className="p-1 text-slate-400 hover:text-red-500"
+                                            >
+                                                <XCircleIcon className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                        {action.type === 'SET_PRIORITY' && (
+                                            <select
+                                                value={action.params.priority}
+                                                onChange={(e) => {
+                                                    const newActions = [...actions];
+                                                    newActions[idx].params = { priority: e.target.value };
+                                                    setActions(newActions);
+                                                }}
+                                                className="w-full px-2 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs"
+                                            >
+                                                <option value="Low">Low</option>
+                                                <option value="Medium">Medium</option>
+                                                <option value="High">High</option>
+                                            </select>
+                                        )}
+                                        {action.type === 'POST_NOTE' && (
+                                            <input
+                                                type="text"
+                                                value={action.params.message}
+                                                onChange={(e) => {
+                                                    const newActions = [...actions];
+                                                    newActions[idx].params = { message: e.target.value };
+                                                    setActions(newActions);
+                                                }}
+                                                placeholder="Note content..."
+                                                className="w-full px-2 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs"
+                                            />
+                                        )}
+                                        {action.type === 'EXECUTE_SHELL' && (
+                                            <input
+                                                type="text"
+                                                value={action.params.command}
+                                                onChange={(e) => {
+                                                    const newActions = [...actions];
+                                                    newActions[idx].params = { command: e.target.value };
+                                                    setActions(newActions);
+                                                }}
+                                                placeholder="Whitelisted command (e.g. uptime)"
+                                                className="w-full px-2 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono"
+                                            />
+                                        )}
+                                    </div>
+                                ))}
+                                {actions.length === 0 && (
+                                    <div className="p-4 bg-indigo-50 dark:bg-brand-primary/10 border border-brand-primary/20 rounded-2xl flex items-start gap-4">
+                                        <ShieldCheckIcon className="w-5 h-5 text-brand-primary mt-0.5" />
+                                        <div className="space-y-1">
+                                            <p className="text-xs font-bold text-brand-primary uppercase tracking-wider">Default Action</p>
+                                            <p className="text-[10px] text-indigo-700 dark:text-indigo-300 leading-relaxed">
+                                                A status note will be automatically posted if no actions are defined.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                         <div className="px-8 py-6 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
