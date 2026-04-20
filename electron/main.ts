@@ -4,7 +4,7 @@ import * as fs from 'node:fs'
 import robot from 'robotjs'
 import { Low } from 'lowdb'
 import { TextFile } from 'lowdb/node'
-import type { Ticket, Solution, RemoteSession, TicketStatus } from '../types'
+import type { Ticket, Solution, RemoteSession, TicketStatus, AutomationRule } from '../types'
 import { exec } from 'child_process'
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import si from 'systeminformation'
@@ -34,6 +34,7 @@ type Data = {
   tickets: Ticket[];
   solutions: Solution[];
   remoteSessions: RemoteSession[];
+  automationRules: AutomationRule[];
   auditLogs: {
     id: string;
     timestamp: string;
@@ -90,6 +91,41 @@ const initDatabase = async () => {
         tickets: [],
         solutions: [],
         remoteSessions: [],
+        automationRules: [
+            {
+                id: 'rule-vpn-frustrated',
+                workspaceId: 'DEFAULT',
+                name: 'VPN Frustration Escalation',
+                description: 'Automatically set high priority and assign to Senior Support if a VPN ticket detects frustrated sentiment.',
+                isEnabled: true,
+                trigger: 'TICKET_CREATED',
+                conditions: [
+                    { field: 'title', operator: 'contains', value: 'VPN' },
+                    { field: 'sentiment', operator: 'equals', value: 'Frustrated' }
+                ],
+                actions: [
+                    { type: 'SET_PRIORITY', params: { priority: 'High' } },
+                    { type: 'POST_NOTE', params: { message: 'AI: Escalating due to detected user frustration on a critical VPN issue.' } }
+                ],
+                executionCount: 0
+            },
+            {
+                id: 'rule-disk-low',
+                workspaceId: 'DEFAULT',
+                name: 'Auto-Clear Cache on Low Disk',
+                description: 'Execute cleanup when disk usage exceeds 85%.',
+                isEnabled: true,
+                trigger: 'SYSTEM_METRIC_THRESHOLD',
+                conditions: [
+                    { field: 'diskUsage', operator: 'greater_than', value: 85 }
+                ],
+                actions: [
+                    { type: 'EXECUTE_SHELL', params: { command: 'df -h' } },
+                    { type: 'POST_NOTE', params: { message: 'AI: Disk usage critical. Performed system health check.' } }
+                ],
+                executionCount: 0
+            }
+        ],
         auditLogs: [],
         settings: {
             role: 'admin',
@@ -237,6 +273,10 @@ ipcMain.handle('db-create-ticket', async (event, ticket) => {
     const ticketWithWorkspace = { ...ticket, workspaceId: db.data.settings.activeWorkspaceId };
     db.data.tickets.push(ticketWithWorkspace);
     await db.write();
+
+    // Trigger Automation Rules
+    await evaluateAutomationRules('TICKET_CREATED', ticketWithWorkspace);
+
     return ticketWithWorkspace;
 });
 
@@ -267,18 +307,43 @@ ipcMain.handle('db-update-ticket', async (event, updatedTicket: Ticket) => {
 });
 
 const triggerPassiveKbGeneration = async (ticket: Ticket) => {
+    if (!genAI) return;
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const prompt = `Convert this resolved ticket into a professional KB article. Markdown only. TICKET: ${JSON.stringify(ticket)}`;
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
+        const prompt = `
+            Convert this resolved IT support ticket into a professional Knowledge Base solution object.
+            TICKET: ${JSON.stringify(ticket)}
+
+            Respond with JSON:
+            {
+                "problemDescription": "string",
+                "solutionDescription": "markdown string",
+                "tags": ["string"],
+                "executableActions": ["string"]
+            }
+
+            Guidelines:
+            - problemDescription should be a clear, searchable summary of the issue.
+            - solutionDescription should use markdown and be concise.
+            - tags should be relevant technical keywords.
+            - executableActions should be shell commands from this whitelist ONLY: [ping, ifconfig, ipconfig, netstat, ls, dir, uptime, whoami, df, free, ps, top, pkill, systemctl, journalctl].
+        `;
         const result = await model.generateContent(prompt);
-        const article = result.response.text();
+        const data = JSON.parse(result.response.text());
 
         const newSolution: Solution = {
             id: `SOL-AUTO-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
             workspaceId: ticket.workspaceId,
-            problemDescription: ticket.title,
-            solutionDescription: article,
-            actions: []
+            problemDescription: data.problemDescription || ticket.title,
+            solutionDescription: data.solutionDescription,
+            tags: data.tags || [],
+            executableActions: (data.executableActions || []).filter((cmd: string) => {
+                const base = cmd.trim().split(' ')[0].toLowerCase();
+                return ALLOWED_COMMANDS.includes(base);
+            })
         };
         db.data.solutions.push(newSolution);
         await db.write();
@@ -340,6 +405,102 @@ ipcMain.handle('db-delete-remote-session', async (event, ticketId) => {
     db.data.remoteSessions = db.data.remoteSessions.filter(s => s.ticketId !== ticketId);
     await db.write();
 });
+
+// --- Automation Rules Handlers ---
+ipcMain.handle('db-get-automation-rules', () => {
+    return db.data.automationRules.filter(r => r.workspaceId === db.data.settings.activeWorkspaceId);
+});
+
+ipcMain.handle('db-update-automation-rule', async (event, updatedRule: AutomationRule) => {
+    const index = db.data.automationRules.findIndex(r => r.id === updatedRule.id);
+    if (index !== -1) {
+        db.data.automationRules[index] = updatedRule;
+        await db.write();
+        return updatedRule;
+    }
+    throw new Error('Rule not found');
+});
+
+ipcMain.handle('db-create-automation-rule', async (event, rule: Omit<AutomationRule, 'id' | 'executionCount'>) => {
+    const newRule: AutomationRule = {
+        ...rule,
+        id: `rule-${Math.random().toString(36).substr(2, 9)}`,
+        workspaceId: db.data.settings.activeWorkspaceId,
+        executionCount: 0
+    };
+    db.data.automationRules.push(newRule);
+    await db.write();
+    return newRule;
+});
+
+ipcMain.handle('db-delete-automation-rule', async (event, id) => {
+    db.data.automationRules = db.data.automationRules.filter(r => r.id !== id);
+    await db.write();
+    return true;
+});
+
+const evaluateAutomationRules = async (trigger: string, context: any) => {
+    const activeRules = db.data.automationRules.filter(r => r.isEnabled && r.trigger === trigger && r.workspaceId === db.data.settings.activeWorkspaceId);
+
+    for (const rule of activeRules) {
+        const matches = rule.conditions.every(condition => {
+            const val = context[condition.field];
+            if (val === undefined) return false;
+
+            switch (condition.operator) {
+                case 'equals': return val === condition.value;
+                case 'contains': return String(val).toLowerCase().includes(String(condition.value).toLowerCase());
+                case 'greater_than': return Number(val) > Number(condition.value);
+                case 'less_than': return Number(val) < Number(condition.value);
+                default: return false;
+            }
+        });
+
+        if (matches) {
+            console.log(`[AIOps] Executing Automation Rule: ${rule.name}`);
+            for (const action of rule.actions) {
+                try {
+                    switch (action.type) {
+                        case 'SET_PRIORITY':
+                            if (context.id) {
+                                const ticket = db.data.tickets.find(t => t.id === context.id);
+                                if (ticket) ticket.priority = action.params.priority;
+                            }
+                            break;
+                        case 'POST_NOTE':
+                            if (context.id) {
+                                const ticket = db.data.tickets.find(t => t.id === context.id);
+                                if (ticket) {
+                                    ticket.activities?.push({
+                                        id: Math.random().toString(36).substr(2, 9),
+                                        timestamp: new Date().toISOString(),
+                                        type: 'note',
+                                        message: action.params.message,
+                                        user: 'FixDesk AI (Automation)'
+                                    });
+                                }
+                            }
+                            break;
+                        case 'EXECUTE_SHELL':
+                             // Whitelist check and execution
+                             const cmd = action.params.command;
+                             const baseCmd = cmd.trim().split(' ')[0].toLowerCase();
+                             if (ALLOWED_COMMANDS.includes(baseCmd)) {
+                                 exec(cmd);
+                             }
+                             break;
+                        // Add more actions as needed
+                    }
+                } catch (e) {
+                    console.error(`[AIOps] Action ${action.type} failed for rule ${rule.name}:`, e);
+                }
+            }
+            rule.executionCount++;
+            rule.lastExecutedAt = new Date().toISOString();
+            await db.write();
+        }
+    }
+};
 
 ipcMain.handle('db-get-settings', () => {
     return db.data.settings;
@@ -599,6 +760,9 @@ const startMonitoring = () => {
                 console.log(`[AIOps] Critical metrics detected: CPU ${cpuUsage.toFixed(1)}%, Mem ${memUsage.toFixed(1)}%, Disk ${diskUsage.toFixed(1)}%`);
                 await triggerAutonomousResolution({ cpuUsage, memUsage, diskUsage, topProcesses });
             }
+
+            // Evaluation of custom Automation Rules for metrics
+            await evaluateAutomationRules('SYSTEM_METRIC_THRESHOLD', { cpuUsage, memUsage, diskUsage });
         } catch (error) {
             console.error('[AIOps] Monitoring error:', error);
         }
@@ -942,6 +1106,39 @@ ipcMain.handle('ai-parse-search-query', async (event, query) => {
     } catch (error) {
         console.error("Search Query Parsing Error:", error);
         return { status: null, priority: null, category: null, timeRange: null, keyword: query };
+    }
+});
+
+ipcMain.handle('ai-semantic-search-kb', async (event, { query, solutions }) => {
+    try {
+        // In a real enterprise app, we'd use a vector DB.
+        // Here we use Gemini 1.5 Flash to re-rank the solutions based on semantic relevance to the query.
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const context = solutions.map((s: any) => ({ id: s.id, problem: s.problemDescription }));
+        const prompt = `
+            You are a semantic search engine. Given a list of IT Knowledge Base solutions and a user query,
+            rank the solutions by their semantic relevance to the query.
+
+            QUERY: "${query}"
+            SOLUTIONS: ${JSON.stringify(context)}
+
+            Respond with ONLY a JSON array of solution IDs in order of relevance: ["id1", "id2", ...]
+        `;
+
+        const result = await model.generateContent(prompt);
+        const rankedIds = JSON.parse(result.response.text());
+
+        // Return original solutions sorted by the AI's ranking
+        return rankedIds
+            .map((id: string) => solutions.find((s: any) => s.id === id))
+            .filter(Boolean);
+    } catch (error) {
+        console.error("Semantic Search Error:", error);
+        return solutions; // Fallback to original list
     }
 });
 

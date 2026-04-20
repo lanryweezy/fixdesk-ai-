@@ -1,6 +1,6 @@
 import React from 'react';
 import { Page } from '../App';
-import { ChartBarIcon, TicketIcon, BrainCircuit, ComputerDesktopIcon, ShieldCheckIcon, UserGroupIcon, Cog8ToothIcon } from './icons/Icons';
+import { ChartBarIcon, TicketIcon, BrainCircuit, ComputerDesktopIcon, ShieldCheckIcon, UserGroupIcon, Cog8ToothIcon, CogIcon } from './icons/Icons';
 
 import { Ticket, TicketStatus } from '../types';
 
@@ -24,6 +24,7 @@ const navItems = [
 
 const adminNavItems = [
     { name: 'Remote Control', icon: ShieldCheckIcon, page: 'remote', roles: ['admin'] },
+    { name: 'Automation Rules', icon: CogIcon, page: 'automation-rules', roles: ['admin'] },
 ]
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReportIssue, role, onRoleToggle, tickets, userName }) => {

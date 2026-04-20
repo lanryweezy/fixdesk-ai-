@@ -12,12 +12,13 @@ import { ReportIssueModal } from './components/ReportIssueModal';
 import { GlobalAssistant } from './components/GlobalAssistant';
 import { RemoteControlView } from './components/RemoteControlView';
 import { StartRemoteSession } from './components/StartRemoteSession';
+import { AutomationRules } from './components/AutomationRules';
 import { Card } from './components/common/Card';
 import { useToast } from './services/ToastContext';
 import { Ticket, Activity, Solution } from './types';
 import { BrainCircuit, ArrowUturnLeftIcon } from './components/icons/Icons';
 
-export type Page = 'dashboard' | 'tickets' | 'remote' | 'start-remote-session' | 'knowledge-base' | 'settings' | 'kb-article';
+export type Page = 'dashboard' | 'tickets' | 'remote' | 'start-remote-session' | 'knowledge-base' | 'settings' | 'kb-article' | 'automation-rules';
 
 export default function App() {
   const { addToast } = useToast();
@@ -272,6 +273,8 @@ export default function App() {
         return <RemoteControlView ticketId={remoteTicketId || undefined} />;
       case 'start-remote-session':
         return <StartRemoteSession ticketId={remoteTicketId || undefined} />;
+      case 'automation-rules':
+        return <AutomationRules />;
       default:
         return <Dashboard tickets={tickets} />;
     }

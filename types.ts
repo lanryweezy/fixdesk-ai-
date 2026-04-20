@@ -45,7 +45,8 @@ export interface Solution {
   workspaceId?: string;
   problemDescription: string;
   solutionDescription: string;
-  actions: RecordedAction[];
+  tags?: string[];
+  actions?: RecordedAction[];
   executableActions?: string[]; // New: whitelisted shell commands
 }
 
@@ -84,3 +85,29 @@ export type ConversationResult = {
   type: 'error';
   message: string;
 };
+
+// --- AIOps Automation Rules Engine Types ---
+
+export type AutomationTrigger = 'TICKET_CREATED' | 'SYSTEM_METRIC_THRESHOLD' | 'USER_SENTIMENT_NEGATIVE';
+
+export type AutomationAction = 'EXECUTE_SHELL' | 'ASSIGN_TICKET' | 'POST_NOTE' | 'SET_PRIORITY' | 'RESOLVE_TICKET';
+
+export interface AutomationRule {
+    id: string;
+    workspaceId: string;
+    name: string;
+    description: string;
+    isEnabled: boolean;
+    trigger: AutomationTrigger;
+    conditions: {
+        field: string;
+        operator: 'equals' | 'contains' | 'greater_than' | 'less_than';
+        value: any;
+    }[];
+    actions: {
+        type: AutomationAction;
+        params: Record<string, any>;
+    }[];
+    executionCount: number;
+    lastExecutedAt?: string;
+}

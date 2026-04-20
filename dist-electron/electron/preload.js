@@ -29,8 +29,13 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     updateSettings: (settings) => electron_1.ipcRenderer.invoke('db-update-settings', settings),
     generateMockData: () => electron_1.ipcRenderer.invoke('db-generate-mock-data'),
     exportSupportBundle: () => electron_1.ipcRenderer.invoke('export-support-bundle'),
+    exportAuditReport: () => electron_1.ipcRenderer.invoke('export-audit-report'),
     getAuditLogs: () => electron_1.ipcRenderer.invoke('db-get-audit-logs'),
     getSystemDiagnostics: () => electron_1.ipcRenderer.invoke('get-system-diagnostics'),
+    getAutomationRules: () => electron_1.ipcRenderer.invoke('db-get-automation-rules'),
+    updateAutomationRule: (rule) => electron_1.ipcRenderer.invoke('db-update-automation-rule', rule),
+    createAutomationRule: (rule) => electron_1.ipcRenderer.invoke('db-create-automation-rule', rule),
+    deleteAutomationRule: (id) => electron_1.ipcRenderer.invoke('db-delete-automation-rule', id),
     // AI actions
     aiChat: (message, history, screenshot) => electron_1.ipcRenderer.invoke('ai-chat', { message, history, screenshot }),
     categorizeAndPrioritize: (title, description) => electron_1.ipcRenderer.invoke('ai-categorize-prioritize', { title, description }),
@@ -41,6 +46,7 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     getSystemHealth: (tickets) => electron_1.ipcRenderer.invoke('ai-get-system-health', tickets),
     rootCauseAnalysis: (ticket) => electron_1.ipcRenderer.invoke('ai-root-cause-analysis', ticket),
     parseSearchQuery: (query) => electron_1.ipcRenderer.invoke('ai-parse-search-query', query),
+    semanticSearchKb: (query, solutions) => electron_1.ipcRenderer.invoke('ai-semantic-search-kb', { query, solutions }),
     analyzeSupportBundle: () => electron_1.ipcRenderer.invoke('ai-analyze-support-bundle'),
     startConversation: (videoBase64, prompt) => electron_1.ipcRenderer.invoke('ai-start-conversation', { videoBase64, prompt }),
     // Event Listeners

@@ -5,7 +5,7 @@ import { mockAnalyticsData } from '../constants';
 import { Ticket, TicketStatus, Activity } from '../types';
 import { ITTerminal } from './ITTerminal';
 import ReactMarkdown from 'react-markdown';
-import { ChatBubbleBottomCenterTextIcon, BrainCircuit, ShieldCheckIcon, SpinnerIcon, CloudArrowDownIcon, DocumentTextIcon, XMarkIcon } from './icons/Icons';
+import { ChatBubbleBottomCenterTextIcon, BrainCircuit, ShieldCheckIcon, SpinnerIcon, CloudArrowDownIcon, DocumentTextIcon, XMarkIcon, ChartBarIcon } from './icons/Icons';
 import { useToast } from '../services/ToastContext';
 
 const PIE_COLORS = { 'FixDesk AI': '#4F46E5', 'IT Support Team': '#A78BFA' };
@@ -112,6 +112,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
     const humanCount = filteredTickets.filter(t => t.status === TicketStatus.RESOLVED).length;
     const autoRate = resolved.length > 0 ? Math.round((aiCount / resolved.length) * 100) : 0;
 
+    // Business Impact Metrics
+    const hoursSaved = aiCount * 1.5; // Estimating 1.5 human hours per AI resolution
+    const costSaved = hoursSaved * 85; // $85/hr blended IT labor rate
+
     // Calculate average resolution time
     let totalResTime = 0;
     resolved.forEach(t => {
@@ -125,7 +129,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
     const avgResMs = resolved.length > 0 ? totalResTime / resolved.length : 0;
     const avgResHours = Math.round((avgResMs / (1000 * 60 * 60)) * 10) / 10;
 
-    return { total, resolvedCount: resolved.length, aiCount, humanCount, autoRate, avgResHours };
+    return { total, resolvedCount: resolved.length, aiCount, humanCount, autoRate, avgResHours, hoursSaved, costSaved };
   }, [filteredTickets]);
 
   const resolutionByData = useMemo(() => [
@@ -327,6 +331,64 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
         <StatCard title="AI Autonomy" value={`${stats.autoRate}%`} subtext="No human intervention" icon={<BrainCircuit className="w-5 h-5" />} />
         <StatCard title="Mean Time (MTTR)" value={`${stats.avgResHours}h`} subtext="Average resolution speed" icon={<ChatBubbleBottomCenterTextIcon className="w-5 h-5" />} />
       </div>
+
+      {role === 'admin' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="bg-gradient-to-br from-slate-900 to-slate-800 border-none text-white overflow-hidden relative group">
+                  <div className="relative z-10 p-2">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-2 bg-white/10 rounded-xl">
+                                <ChartBarIcon className="w-6 h-6 text-brand-accent" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400">Human Hours Saved</h3>
+                                <p className="text-xs text-slate-500">Workspace Efficiency Index</p>
+                            </div>
+                        </div>
+                        <div className="flex items-end gap-4">
+                            <p className="text-6xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-brand-accent to-indigo-400">{stats.hoursSaved.toFixed(1)}h</p>
+                            <div className="mb-2">
+                                <span className="text-emerald-400 font-black text-sm flex items-center gap-1">
+                                    ↑ {((stats.hoursSaved / (stats.total || 1)) * 10).toFixed(1)}%
+                                </span>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase">vs Previous Period</p>
+                            </div>
+                        </div>
+                        <div className="mt-8 flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                <div className="h-full bg-brand-accent rounded-full" style={{ width: `${Math.min(100, stats.autoRate)}%` }}></div>
+                            </div>
+                            <span className="text-[10px] font-black text-slate-400 uppercase">{stats.autoRate}% AI Load</span>
+                        </div>
+                  </div>
+                  <div className="absolute -right-10 -top-10 w-64 h-64 bg-brand-primary opacity-10 blur-[100px] group-hover:opacity-20 transition-opacity"></div>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-indigo-900 to-brand-secondary border-none text-white overflow-hidden relative group">
+                  <div className="relative z-10 p-2">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-2 bg-white/10 rounded-xl">
+                                <ShieldCheckIcon className="w-6 h-6 text-emerald-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold uppercase tracking-widest text-indigo-200">AIOps Capital ROI</h3>
+                                <p className="text-xs text-indigo-300/60">Estimated Cost Reduction</p>
+                            </div>
+                        </div>
+                        <div className="flex items-end gap-4">
+                            <p className="text-6xl font-black tracking-tighter text-white">${stats.costSaved.toLocaleString()}</p>
+                            <div className="mb-2">
+                                <span className="px-2 py-0.5 bg-emerald-500 text-white font-black text-[10px] rounded uppercase">Optimized</span>
+                            </div>
+                        </div>
+                        <p className="mt-8 text-[11px] text-indigo-200/80 font-medium leading-relaxed">
+                            Calculated based on a standard blended IT labor rate of <span className="font-bold text-white">$85/hour</span> across all autonomously resolved and AI-assisted incidents.
+                        </p>
+                  </div>
+                   <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-emerald-500 opacity-10 blur-[100px] group-hover:opacity-20 transition-opacity"></div>
+              </Card>
+          </div>
+      )}
 
       {role === 'admin' && selfHealedTickets.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-left duration-700">

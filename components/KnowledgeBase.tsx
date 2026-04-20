@@ -22,10 +22,36 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ role = 'admin', on
     threshold: 0.3
   }), [solutions]);
 
-  const filteredSolutions = useMemo(() => {
-    if (!searchTerm.trim()) return solutions;
-    return fuse.search(searchTerm).map(r => r.item);
-  }, [solutions, searchTerm, fuse]);
+  const [filteredSolutions, setFilteredSolutions] = useState<Solution[]>([]);
+  const [isSearchingAI, setIsSearchingAI] = useState(false);
+
+  useEffect(() => {
+    const performSearch = async () => {
+        if (!searchTerm.trim()) {
+            setFilteredSolutions(solutions);
+            return;
+        }
+
+        // We use fuse for immediate fuzzy results
+        const fuzzyResults = fuse.search(searchTerm).map(r => r.item);
+        setFilteredSolutions(fuzzyResults);
+
+        // Then we upgrade to semantic AI search if it's more than a few characters
+        if (searchTerm.length > 3) {
+            setIsSearchingAI(true);
+            try {
+                const semanticResults = await window.electronAPI.semanticSearchKb(searchTerm, solutions);
+                setFilteredSolutions(semanticResults);
+            } catch (e) {
+                console.error("AI Search failed", e);
+            } finally {
+                setIsSearchingAI(false);
+            }
+        }
+    };
+    performSearch();
+  }, [searchTerm, solutions, fuse]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newProblem, setNewProblem] = useState('');
   const [newSolution, setNewSolution] = useState('');
@@ -87,16 +113,21 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ role = 'admin', on
       <div className="relative">
         <input
           type="text"
-          placeholder="Search for solutions..."
+          placeholder="Search for solutions using natural language (AI-powered)..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent transition-all"
+          className="w-full pl-10 pr-12 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent transition-all"
         />
         <div className="absolute left-3 top-3.5 text-slate-400">
            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
            </svg>
         </div>
+        {isSearchingAI && (
+            <div className="absolute right-4 top-3.5">
+                <SpinnerIcon className="w-5 h-5 text-brand-primary animate-spin" />
+            </div>
+        )}
       </div>
 
       {isLoading ? (
