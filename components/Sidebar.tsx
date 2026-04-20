@@ -25,6 +25,7 @@ const navItems = [
 const adminNavItems = [
     { name: 'Remote Control', icon: ShieldCheckIcon, page: 'remote', roles: ['admin'] },
     { name: 'Automation Rules', icon: CogIcon, page: 'automation-rules', roles: ['admin'] },
+    { name: 'Security & Audit', icon: ShieldCheckIcon, page: 'security-center', roles: ['admin'] },
 ]
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReportIssue, role, onRoleToggle, tickets, userName }) => {

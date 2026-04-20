@@ -24,6 +24,7 @@ export const AutomationRules: React.FC = () => {
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [trigger, setTrigger] = useState<AutomationTrigger>('TICKET_CREATED');
+    const [conditions, setConditions] = useState<{ field: string, operator: any, value: string }[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
@@ -73,10 +74,14 @@ export const AutomationRules: React.FC = () => {
                 description,
                 trigger,
                 isEnabled: true,
-                workspaceId: 'DEFAULT', // Managed by backend but kept for type safety
-                conditions: [], // UI for complex conditions can be added later
+                workspaceId: 'DEFAULT',
+                conditions: conditions.map(c => ({
+                    field: c.field,
+                    operator: c.operator,
+                    value: c.field === 'diskUsage' || c.field === 'cpuUsage' || c.field === 'memUsage' ? Number(c.value) : c.value
+                })),
                 actions: [
-                    { type: 'POST_NOTE', params: { message: 'Rule executed automatically.' } }
+                    { type: 'POST_NOTE', params: { message: `AI: Automation rule "${name}" triggered.` } }
                 ]
             };
             const created = await window.electronAPI.createAutomationRule(newRule);
@@ -84,6 +89,7 @@ export const AutomationRules: React.FC = () => {
             setIsModalOpen(false);
             setName('');
             setDescription('');
+            setConditions([]);
             addToast('Automation rule created', 'success');
         } catch (e) {
             addToast('Failed to create rule', 'error');
@@ -230,13 +236,87 @@ export const AutomationRules: React.FC = () => {
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Trigger Event</label>
                                 <select
                                     value={trigger}
-                                    onChange={(e) => setTrigger(e.target.value as AutomationTrigger)}
+                                    onChange={(e) => {
+                                        setTrigger(e.target.value as AutomationTrigger);
+                                        setConditions([]); // Reset conditions when trigger changes
+                                    }}
                                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-primary outline-none transition-all text-slate-800 dark:text-slate-100 font-bold"
                                 >
                                     <option value="TICKET_CREATED">When a ticket is created</option>
                                     <option value="SYSTEM_METRIC_THRESHOLD">When system metrics exceed thresholds</option>
-                                    <option value="USER_SENTIMENT_NEGATIVE">When negative sentiment is detected</option>
                                 </select>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Logic Conditions</label>
+                                    <button
+                                        onClick={() => setConditions([...conditions, { field: trigger === 'TICKET_CREATED' ? 'title' : 'cpuUsage', operator: 'equals', value: '' }])}
+                                        className="text-[10px] font-black text-brand-primary uppercase hover:underline"
+                                    >
+                                        + Add Condition
+                                    </button>
+                                </div>
+
+                                {conditions.map((cond, idx) => (
+                                    <div key={idx} className="flex gap-2 items-center animate-in slide-in-from-right-2">
+                                        <select
+                                            value={cond.field}
+                                            onChange={(e) => {
+                                                const newConds = [...conditions];
+                                                newConds[idx].field = e.target.value;
+                                                setConditions(newConds);
+                                            }}
+                                            className="flex-1 px-2 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold"
+                                        >
+                                            {trigger === 'TICKET_CREATED' ? (
+                                                <>
+                                                    <option value="title">Title</option>
+                                                    <option value="description">Description</option>
+                                                    <option value="sentiment">Sentiment</option>
+                                                    <option value="priority">Priority</option>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <option value="cpuUsage">CPU Usage (%)</option>
+                                                    <option value="memUsage">Memory Usage (%)</option>
+                                                    <option value="diskUsage">Disk Usage (%)</option>
+                                                </>
+                                            )}
+                                        </select>
+                                        <select
+                                            value={cond.operator}
+                                            onChange={(e) => {
+                                                const newConds = [...conditions];
+                                                newConds[idx].operator = e.target.value;
+                                                setConditions(newConds);
+                                            }}
+                                            className="w-24 px-2 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold"
+                                        >
+                                            <option value="equals">is</option>
+                                            <option value="contains">contains</option>
+                                            <option value="greater_than">&gt;</option>
+                                            <option value="less_than">&lt;</option>
+                                        </select>
+                                        <input
+                                            type="text"
+                                            value={cond.value}
+                                            onChange={(e) => {
+                                                const newConds = [...conditions];
+                                                newConds[idx].value = e.target.value;
+                                                setConditions(newConds);
+                                            }}
+                                            placeholder="Value"
+                                            className="w-24 px-2 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold"
+                                        />
+                                        <button
+                                            onClick={() => setConditions(conditions.filter((_, i) => i !== idx))}
+                                            className="p-1 text-slate-400 hover:text-red-500"
+                                        >
+                                            <XCircleIcon className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
 
                             <div className="p-4 bg-indigo-50 dark:bg-brand-primary/10 border border-brand-primary/20 rounded-2xl flex items-start gap-4">

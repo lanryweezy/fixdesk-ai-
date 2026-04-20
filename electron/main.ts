@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, desktopCapturer, Tray, Menu, nativeImage, dialog, safeStorage } from 'electron'
+import { app, BrowserWindow, ipcMain, desktopCapturer, Tray, Menu, nativeImage, dialog, safeStorage, Notification } from 'electron'
 import * as path from 'node:path'
 import * as fs from 'node:fs'
 import robot from 'robotjs'
@@ -845,6 +845,11 @@ const triggerAutonomousResolution = async (metrics: any) => {
                     newTicket.logs = [`Auto-fix output: ${stdout || stderr}`];
                     db.data.tickets.push(newTicket);
                     db.write();
+                    new Notification({
+                        title: 'FixDesk AIOps: Self-Healing Active',
+                        body: `Action Taken: ${aiResponse.diagnosis}`,
+                        icon: path.join(__dirname, '../assets/tray-icon.png')
+                    }).show();
                     win?.webContents.send('aiops-notification', { title: 'Self-Healing Action Taken', message: aiResponse.diagnosis });
                 });
             } else {
@@ -857,6 +862,11 @@ const triggerAutonomousResolution = async (metrics: any) => {
             db.data.tickets.push(newTicket);
             db.write();
             if (policy === 'manual' && aiResponse.mitigationCommand) {
+                new Notification({
+                    title: 'FixDesk AIOps: Attention Required',
+                    body: `AI suggests mitigation: ${aiResponse.diagnosis}`,
+                    icon: path.join(__dirname, '../assets/tray-icon.png')
+                }).show();
                 win?.webContents.send('aiops-notification', { title: 'AIOps Intervention Required', message: aiResponse.diagnosis });
             }
         }

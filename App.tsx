@@ -13,12 +13,13 @@ import { GlobalAssistant } from './components/GlobalAssistant';
 import { RemoteControlView } from './components/RemoteControlView';
 import { StartRemoteSession } from './components/StartRemoteSession';
 import { AutomationRules } from './components/AutomationRules';
+import { SecurityAuditCenter } from './components/SecurityAuditCenter';
 import { Card } from './components/common/Card';
 import { useToast } from './services/ToastContext';
 import { Ticket, Activity, Solution } from './types';
 import { BrainCircuit, ArrowUturnLeftIcon } from './components/icons/Icons';
 
-export type Page = 'dashboard' | 'tickets' | 'remote' | 'start-remote-session' | 'knowledge-base' | 'settings' | 'kb-article' | 'automation-rules';
+export type Page = 'dashboard' | 'tickets' | 'remote' | 'start-remote-session' | 'knowledge-base' | 'settings' | 'kb-article' | 'automation-rules' | 'security-center';
 
 export default function App() {
   const { addToast } = useToast();
@@ -275,6 +276,8 @@ export default function App() {
         return <StartRemoteSession ticketId={remoteTicketId || undefined} />;
       case 'automation-rules':
         return <AutomationRules />;
+      case 'security-center':
+        return <SecurityAuditCenter />;
       default:
         return <Dashboard tickets={tickets} />;
     }
