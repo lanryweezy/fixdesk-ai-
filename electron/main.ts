@@ -142,6 +142,9 @@ const initDatabase = async () => {
     db = new Low<Data>(adapter, defaultData);
     await db.read();
 
+    // Start Scheduler
+    startScheduler();
+
     // Decrypt API key if it exists
     if (db.data.settings.geminiApiKey && safeStorage.isEncryptionAvailable()) {
         try {
@@ -502,6 +505,22 @@ const evaluateAutomationRules = async (trigger: string, context: any) => {
     }
 };
 
+const startScheduler = () => {
+    setInterval(async () => {
+        const scheduledRules = db.data.automationRules.filter(r => r.isEnabled && r.trigger === 'SCHEDULED');
+        for (const rule of scheduledRules) {
+            // Logic: Execute if lastExecutedAt is not today (simplistic daily schedule)
+            const today = new Date().toDateString();
+            const lastRun = rule.lastExecutedAt ? new Date(rule.lastExecutedAt).toDateString() : null;
+
+            if (today !== lastRun) {
+                console.log(`[AIOps] Running Scheduled Rule: ${rule.name}`);
+                await evaluateAutomationRules('SCHEDULED', { timestamp: new Date().toISOString() });
+            }
+        }
+    }, 60000 * 60); // Check every hour
+};
+
 ipcMain.handle('db-get-settings', () => {
     return db.data.settings;
 });
@@ -704,14 +723,23 @@ ipcMain.handle('db-get-audit-logs', () => {
     return db.data.auditLogs.slice(-100).reverse(); // Return last 100 logs
 });
 
-ipcMain.handle('export-audit-report', async () => {
+ipcMain.handle('export-audit-report', async (event, format = 'json') => {
+    const isCsv = format === 'csv';
     const { filePath } = await dialog.showSaveDialog({
-        title: 'Export SOC2 Audit Report',
-        defaultPath: path.join(app.getPath('downloads'), `soc2-audit-${new Date().toISOString().split('T')[0]}.json`),
-        filters: [{ name: 'JSON', extensions: ['json'] }]
+        title: `Export SOC2 Audit Report (${format.toUpperCase()})`,
+        defaultPath: path.join(app.getPath('downloads'), `soc2-audit-${new Date().toISOString().split('T')[0]}.${isCsv ? 'csv' : 'json'}`),
+        filters: [{ name: format.toUpperCase(), extensions: [format] }]
     });
 
     if (filePath) {
+        if (isCsv) {
+            const header = 'Timestamp,Operator,Command,Outcome,Reason\n';
+            const rows = db.data.auditLogs.map(log =>
+                `"${log.timestamp}","${log.user}","${log.command.replace(/"/g, '""')}","${log.outcome}","${(log.reason || '').replace(/"/g, '""')}"`
+            ).join('\n');
+            fs.writeFileSync(filePath, header + rows);
+            return true;
+        }
         const report = {
             exportedAt: new Date().toISOString(),
             exportedBy: db.data.settings.userName,

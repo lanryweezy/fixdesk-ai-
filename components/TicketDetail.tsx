@@ -289,25 +289,49 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
     e.preventDefault();
     if (!internalNote.trim()) return;
 
+    const noteText = internalNote.trim();
+    const isAiMentioned = noteText.toLowerCase().includes('@ai');
+
     setIsUpdatingStatus(true);
     try {
-        const activity: Activity = {
+        const activities = [...(ticket.activities || [])];
+
+        // Add human note
+        const humanActivity: Activity = {
             id: Math.random().toString(36).substr(2, 9),
             timestamp: new Date().toISOString(),
             type: 'note',
-            message: `Internal Note: ${internalNote}`,
+            message: `Internal Note: ${noteText}`,
             user: 'Alex Smith'
         };
+        activities.push(humanActivity);
+
+        if (isAiMentioned) {
+            addToast('AI is processing your mention...', 'info');
+            const question = noteText.replace(/@ai/gi, '').trim() || 'Please provide technical advice for this ticket.';
+            const aiResponse = await window.electronAPI.askAboutTicket(ticket, question);
+
+            const aiActivity: Activity = {
+                id: Math.random().toString(36).substr(2, 9),
+                timestamp: new Date().toISOString(),
+                type: 'note',
+                message: `**AI Assistant response to mention:**\n\n${aiResponse}`,
+                user: 'FixDesk AI'
+            };
+            activities.push(aiActivity);
+        }
+
         const updatedTicket = await window.electronAPI.updateTicket({
             ...ticket,
-            activities: [...(ticket.activities || []), activity]
+            activities
         });
+
         setTicket(updatedTicket);
         if (onUpdate) onUpdate(updatedTicket);
         setInternalNote('');
-        addToast('Internal note added', 'success');
+        addToast(isAiMentioned ? 'AI responded to note' : 'Internal note added', 'success');
     } catch (error) {
-        addToast('Failed to add internal note', 'error');
+        addToast('Failed to add internal note or AI failed to respond', 'error');
     } finally {
         setIsUpdatingStatus(false);
     }

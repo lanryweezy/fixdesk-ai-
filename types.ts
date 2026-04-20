@@ -88,7 +88,7 @@ export type ConversationResult = {
 
 // --- AIOps Automation Rules Engine Types ---
 
-export type AutomationTrigger = 'TICKET_CREATED' | 'SYSTEM_METRIC_THRESHOLD' | 'USER_SENTIMENT_NEGATIVE';
+export type AutomationTrigger = 'TICKET_CREATED' | 'SYSTEM_METRIC_THRESHOLD' | 'USER_SENTIMENT_NEGATIVE' | 'SCHEDULED';
 
 export type AutomationAction = 'EXECUTE_SHELL' | 'ASSIGN_TICKET' | 'POST_NOTE' | 'SET_PRIORITY' | 'RESOLVE_TICKET';
 

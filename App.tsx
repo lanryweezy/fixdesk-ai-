@@ -40,6 +40,11 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isSSOLoading, setIsSSOLoading] = useState(false);
 
+  const refreshTickets = useCallback(async () => {
+    const storedTickets = await window.electronAPI.getTickets();
+    setTickets(storedTickets);
+  }, []);
+
   useEffect(() => {
     // Listen for AIOps events
     window.electronAPI.onAIOpsNotification((data) => {
@@ -119,11 +124,6 @@ export default function App() {
 
   const handleSelectTicket = useCallback((ticket: Ticket) => {
     setSelectedTicket(ticket);
-  }, []);
-
-  const refreshTickets = useCallback(async () => {
-    const storedTickets = await window.electronAPI.getTickets();
-    setTickets(storedTickets);
   }, []);
 
   const handleBackToList = useCallback(async () => {

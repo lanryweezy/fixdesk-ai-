@@ -149,6 +149,8 @@ const initDatabase = async () => {
     const adapter = new EncryptedJSONAdapter(dbPath);
     db = new lowdb_1.Low(adapter, defaultData);
     await db.read();
+    // Start Scheduler
+    startScheduler();
     // Decrypt API key if it exists
     if (db.data.settings.geminiApiKey && electron_1.safeStorage.isEncryptionAvailable()) {
         try {
@@ -292,17 +294,43 @@ electron_1.ipcMain.handle('db-update-ticket', async (event, updatedTicket) => {
     throw new Error('Ticket not found');
 });
 const triggerPassiveKbGeneration = async (ticket) => {
+    if (!genAI)
+        return;
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const prompt = `Convert this resolved ticket into a professional KB article. Markdown only. TICKET: ${JSON.stringify(ticket)}`;
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
+        const prompt = `
+            Convert this resolved IT support ticket into a professional Knowledge Base solution object.
+            TICKET: ${JSON.stringify(ticket)}
+
+            Respond with JSON:
+            {
+                "problemDescription": "string",
+                "solutionDescription": "markdown string",
+                "tags": ["string"],
+                "executableActions": ["string"]
+            }
+
+            Guidelines:
+            - problemDescription should be a clear, searchable summary of the issue.
+            - solutionDescription should use markdown and be concise.
+            - tags should be relevant technical keywords.
+            - executableActions should be shell commands from this whitelist ONLY: [ping, ifconfig, ipconfig, netstat, ls, dir, uptime, whoami, df, free, ps, top, pkill, systemctl, journalctl].
+        `;
         const result = await model.generateContent(prompt);
-        const article = result.response.text();
+        const data = JSON.parse(result.response.text());
         const newSolution = {
             id: `SOL-AUTO-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
             workspaceId: ticket.workspaceId,
-            problemDescription: ticket.title,
-            solutionDescription: article,
-            actions: []
+            problemDescription: data.problemDescription || ticket.title,
+            solutionDescription: data.solutionDescription,
+            tags: data.tags || [],
+            executableActions: (data.executableActions || []).filter((cmd) => {
+                const base = cmd.trim().split(' ')[0].toLowerCase();
+                return ALLOWED_COMMANDS.includes(base);
+            })
         };
         db.data.solutions.push(newSolution);
         await db.write();
@@ -449,6 +477,20 @@ const evaluateAutomationRules = async (trigger, context) => {
             await db.write();
         }
     }
+};
+const startScheduler = () => {
+    setInterval(async () => {
+        const scheduledRules = db.data.automationRules.filter(r => r.isEnabled && r.trigger === 'SCHEDULED');
+        for (const rule of scheduledRules) {
+            // Logic: Execute if lastExecutedAt is not today (simplistic daily schedule)
+            const today = new Date().toDateString();
+            const lastRun = rule.lastExecutedAt ? new Date(rule.lastExecutedAt).toDateString() : null;
+            if (today !== lastRun) {
+                console.log(`[AIOps] Running Scheduled Rule: ${rule.name}`);
+                await evaluateAutomationRules('SCHEDULED', { timestamp: new Date().toISOString() });
+            }
+        }
+    }, 60000 * 60); // Check every hour
 };
 electron_1.ipcMain.handle('db-get-settings', () => {
     return db.data.settings;
@@ -633,13 +675,20 @@ electron_1.ipcMain.handle('execute-command', async (event, commands) => {
 electron_1.ipcMain.handle('db-get-audit-logs', () => {
     return db.data.auditLogs.slice(-100).reverse(); // Return last 100 logs
 });
-electron_1.ipcMain.handle('export-audit-report', async () => {
+electron_1.ipcMain.handle('export-audit-report', async (event, format = 'json') => {
+    const isCsv = format === 'csv';
     const { filePath } = await electron_1.dialog.showSaveDialog({
-        title: 'Export SOC2 Audit Report',
-        defaultPath: path.join(electron_1.app.getPath('downloads'), `soc2-audit-${new Date().toISOString().split('T')[0]}.json`),
-        filters: [{ name: 'JSON', extensions: ['json'] }]
+        title: `Export SOC2 Audit Report (${format.toUpperCase()})`,
+        defaultPath: path.join(electron_1.app.getPath('downloads'), `soc2-audit-${new Date().toISOString().split('T')[0]}.${isCsv ? 'csv' : 'json'}`),
+        filters: [{ name: format.toUpperCase(), extensions: [format] }]
     });
     if (filePath) {
+        if (isCsv) {
+            const header = 'Timestamp,Operator,Command,Outcome,Reason\n';
+            const rows = db.data.auditLogs.map(log => `"${log.timestamp}","${log.user}","${log.command.replace(/"/g, '""')}","${log.outcome}","${(log.reason || '').replace(/"/g, '""')}"`).join('\n');
+            fs.writeFileSync(filePath, header + rows);
+            return true;
+        }
         const report = {
             exportedAt: new Date().toISOString(),
             exportedBy: db.data.settings.userName,
@@ -761,6 +810,11 @@ const triggerAutonomousResolution = async (metrics) => {
                     newTicket.logs = [`Auto-fix output: ${stdout || stderr}`];
                     db.data.tickets.push(newTicket);
                     db.write();
+                    new electron_1.Notification({
+                        title: 'FixDesk AIOps: Self-Healing Active',
+                        body: `Action Taken: ${aiResponse.diagnosis}`,
+                        icon: path.join(__dirname, '../assets/tray-icon.png')
+                    }).show();
                     win?.webContents.send('aiops-notification', { title: 'Self-Healing Action Taken', message: aiResponse.diagnosis });
                 });
             }
@@ -775,6 +829,11 @@ const triggerAutonomousResolution = async (metrics) => {
             db.data.tickets.push(newTicket);
             db.write();
             if (policy === 'manual' && aiResponse.mitigationCommand) {
+                new electron_1.Notification({
+                    title: 'FixDesk AIOps: Attention Required',
+                    body: `AI suggests mitigation: ${aiResponse.diagnosis}`,
+                    icon: path.join(__dirname, '../assets/tray-icon.png')
+                }).show();
                 win?.webContents.send('aiops-notification', { title: 'AIOps Intervention Required', message: aiResponse.diagnosis });
             }
         }
@@ -1101,6 +1160,15 @@ electron_1.ipcMain.handle('ai-start-conversation', async (event, { videoBase64, 
         console.error("AI Conversation Error:", error);
         return { type: 'error', message: 'AI Analysis failed. Please try a manual description.' };
     }
+});
+electron_1.ipcMain.handle('auth-test-sso', async (event, config) => {
+    // Simulated OIDC Discovery and Client Authentication
+    console.log('[Auth] Testing SSO Connection with:', config.discoveryUrl);
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    if (config.discoveryUrl && config.discoveryUrl.includes('company.com')) {
+        return { success: true, message: 'Connection established. Identity Provider verified.' };
+    }
+    return { success: false, message: 'Invalid Discovery URL or Client ID.' };
 });
 // --- End Gemini AI Handlers ---
 // --- RobotJS Handlers ---

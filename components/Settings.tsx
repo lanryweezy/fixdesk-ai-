@@ -254,7 +254,7 @@ export const Settings: React.FC<SettingsProps> = ({ role, onRoleToggle, isDarkMo
                 <button
                     onClick={async () => {
                         setIsTestingSSO(true);
-                        const result = await (window as any).electronAPI.testSSO(ssoConfig);
+                        const result = await window.electronAPI.testSSO(ssoConfig);
                         setIsTestingSSO(false);
                         if (result.success) addToast(result.message, 'success');
                         else addToast(result.message, 'error');

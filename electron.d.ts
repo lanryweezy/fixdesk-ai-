@@ -20,7 +20,7 @@ export interface ElectronApi {
     updateSettings: (settings: Partial<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string, aiOpsPolicy: string, autoLaunch: boolean, geminiApiKey?: string }>) => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string, aiOpsPolicy: string, autoLaunch: boolean, geminiApiKey?: string }>;
     generateMockData: () => Promise<boolean>;
     exportSupportBundle: () => Promise<boolean>;
-    exportAuditReport: () => Promise<boolean>;
+    exportAuditReport: (format?: 'json' | 'csv') => Promise<boolean>;
     getAuditLogs: () => Promise<any[]>;
     getSystemDiagnostics: () => Promise<any>;
     getAutomationRules: () => Promise<AutomationRule[]>;
@@ -28,7 +28,7 @@ export interface ElectronApi {
     createAutomationRule: (rule: Omit<AutomationRule, 'id' | 'executionCount'>) => Promise<AutomationRule>;
     deleteAutomationRule: (id: string) => Promise<boolean>;
     aiChat: (message: string, history: any[], screenshot?: string) => Promise<string>;
-    categorizeAndPrioritize: (title: string, description: string) => Promise<{ priority: 'Low' | 'Medium' | 'High', category: string }>;
+    categorizeAndPrioritize: (title: string, description: string) => Promise<{ priority: 'Low' | 'Medium' | 'High', category: string, sentiment: 'Frustrated' | 'Neutral' | 'Positive' }>;
     askAboutTicket: (ticket: Ticket, question: string) => Promise<string>;
     draftAiResponse: (ticket: Ticket) => Promise<string>;
     summarizeTicket: (ticket: Ticket) => Promise<string>;
@@ -39,7 +39,9 @@ export interface ElectronApi {
     semanticSearchKb: (query: string, solutions: Solution[]) => Promise<Solution[]>;
     analyzeSupportBundle: () => Promise<{ analysis: string, fileName: string } | null>;
     startConversation: (videoBase64: string, prompt: string) => Promise<any>;
+    testSSO: (config: any) => Promise<{ success: boolean, message: string }>;
     onAIOpsNotification: (callback: (data: { title: string, message: string }) => void) => void;
+    onNavigate: (callback: (page: string) => void) => void;
 }
 
 declare global {

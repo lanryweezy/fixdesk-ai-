@@ -49,6 +49,7 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     semanticSearchKb: (query, solutions) => electron_1.ipcRenderer.invoke('ai-semantic-search-kb', { query, solutions }),
     analyzeSupportBundle: () => electron_1.ipcRenderer.invoke('ai-analyze-support-bundle'),
     startConversation: (videoBase64, prompt) => electron_1.ipcRenderer.invoke('ai-start-conversation', { videoBase64, prompt }),
+    testSSO: (config) => electron_1.ipcRenderer.invoke('auth-test-sso', config),
     // Event Listeners
     onAIOpsNotification: (callback) => electron_1.ipcRenderer.on('aiops-notification', (_event, data) => callback(data)),
     onNavigate: (callback) => electron_1.ipcRenderer.on('navigate-to', (_event, page) => callback(page)),

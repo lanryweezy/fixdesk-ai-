@@ -66,7 +66,26 @@ export const AutomationRules: React.FC = () => {
     };
 
     const handleCreateRule = async () => {
-        if (!name.trim()) return;
+        if (!name.trim()) {
+            addToast('Rule name is required', 'error');
+            return;
+        }
+
+        // Validate conditions
+        for (const cond of conditions) {
+            const isNumericField = ['cpuUsage', 'memUsage', 'diskUsage'].includes(cond.field);
+            const isNumericOperator = ['greater_than', 'less_than'].includes(cond.operator);
+
+            if ((isNumericField || isNumericOperator) && isNaN(Number(cond.value))) {
+                addToast(`Value for ${cond.field} must be a number`, 'error');
+                return;
+            }
+            if (!cond.value.trim() && cond.value !== '0') {
+                addToast(`Condition value cannot be empty`, 'error');
+                return;
+            }
+        }
+
         setIsSaving(true);
         try {
             const newRule: Omit<AutomationRule, 'id' | 'executionCount'> = {
@@ -75,11 +94,14 @@ export const AutomationRules: React.FC = () => {
                 trigger,
                 isEnabled: true,
                 workspaceId: 'DEFAULT',
-                conditions: conditions.map(c => ({
-                    field: c.field,
-                    operator: c.operator,
-                    value: c.field === 'diskUsage' || c.field === 'cpuUsage' || c.field === 'memUsage' ? Number(c.value) : c.value
-                })),
+                conditions: conditions.map(c => {
+                    const isNumeric = ['cpuUsage', 'memUsage', 'diskUsage'].includes(c.field) || ['greater_than', 'less_than'].includes(c.operator);
+                    return {
+                        field: c.field,
+                        operator: c.operator,
+                        value: isNumeric ? Number(c.value) : c.value
+                    };
+                }),
                 actions: [
                     { type: 'POST_NOTE', params: { message: `AI: Automation rule "${name}" triggered.` } }
                 ]
@@ -244,6 +266,7 @@ export const AutomationRules: React.FC = () => {
                                 >
                                     <option value="TICKET_CREATED">When a ticket is created</option>
                                     <option value="SYSTEM_METRIC_THRESHOLD">When system metrics exceed thresholds</option>
+                                    <option value="SCHEDULED">On a Daily Schedule (Health Checks)</option>
                                 </select>
                             </div>
 
@@ -276,11 +299,16 @@ export const AutomationRules: React.FC = () => {
                                                     <option value="sentiment">Sentiment</option>
                                                     <option value="priority">Priority</option>
                                                 </>
-                                            ) : (
+                                            ) : trigger === 'SYSTEM_METRIC_THRESHOLD' ? (
                                                 <>
                                                     <option value="cpuUsage">CPU Usage (%)</option>
                                                     <option value="memUsage">Memory Usage (%)</option>
                                                     <option value="diskUsage">Disk Usage (%)</option>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <option value="dayOfWeek">Day of Week</option>
+                                                    <option value="time">Preferred Time</option>
                                                 </>
                                             )}
                                         </select>

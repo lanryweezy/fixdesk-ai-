@@ -42,10 +42,10 @@ export const SecurityAuditCenter: React.FC = () => {
         });
     }, [logs, searchTerm, filterOutcome]);
 
-    const handleExport = async () => {
+    const handleExport = async (format: 'json' | 'csv') => {
         try {
-            const success = await window.electronAPI.exportAuditReport();
-            if (success) addToast('SOC2 Audit Report exported successfully', 'success');
+            const success = await window.electronAPI.exportAuditReport(format);
+            if (success) addToast(`SOC2 Audit Report (${format.toUpperCase()}) exported successfully`, 'success');
         } catch (e) {
             addToast('Export failed', 'error');
         }
@@ -61,13 +61,22 @@ export const SecurityAuditCenter: React.FC = () => {
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 font-medium">Monitor all system-level activities and security enforcement logs.</p>
                 </div>
-                <button
-                    onClick={handleExport}
-                    className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-6 rounded-2xl shadow-lg transition-all active:scale-95"
-                >
-                    <DocumentArrowDownIcon className="w-5 h-5" />
-                    Export Compliance Report
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => handleExport('csv')}
+                        className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold py-3 px-6 rounded-2xl shadow-sm hover:bg-slate-50 transition-all active:scale-95"
+                    >
+                        <DocumentArrowDownIcon className="w-5 h-5" />
+                        Export CSV
+                    </button>
+                    <button
+                        onClick={() => handleExport('json')}
+                        className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-6 rounded-2xl shadow-lg transition-all active:scale-95"
+                    >
+                        <DocumentArrowDownIcon className="w-5 h-5" />
+                        Export JSON
+                    </button>
+                </div>
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
