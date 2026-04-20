@@ -33,6 +33,43 @@ export interface Ticket {
   sentiment?: 'Frustrated' | 'Neutral' | 'Positive';
   activities?: Activity[];
   attachments?: { name: string; url: string }[];
+  customFields?: Record<string, any>;
+  slaDeadline?: string;
+  slaStatus?: 'Met' | 'Breached' | 'Warning';
+}
+
+export interface CustomFieldDefinition {
+  id: string;
+  workspaceId: string;
+  name: string;
+  type: 'text' | 'number' | 'date' | 'dropdown';
+  options?: string[];
+  isRequired: boolean;
+}
+
+export interface SLAPolicy {
+  id: string;
+  workspaceId: string;
+  name: string;
+  priority: 'Low' | 'Medium' | 'High';
+  responseTimeHours: number;
+  resolutionTimeHours: number;
+}
+
+export interface LicenseInfo {
+  status: 'trial' | 'active' | 'expired' | 'revoked';
+  licenseKey: string;
+  expiryDate: string;
+  seats: number;
+  activatedAt?: string;
+}
+
+export interface BackupConfig {
+  autoBackupEnabled: boolean;
+  frequency: 'daily' | 'weekly';
+  lastBackupAt?: string;
+  retentionDays: number;
+  provider: 'local' | 's3';
 }
 
 export interface RecordedAction {
