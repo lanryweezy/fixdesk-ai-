@@ -153,7 +153,6 @@ export const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ onClose, onT
         description: analysisResult.description,
         status: TicketStatus.NEW,
         priority: analysisResult.priority,
-        sentiment: (analysisResult as any).sentiment,
         videoUrl: 'https://mock.url/video.mp4',
         attachments
       });

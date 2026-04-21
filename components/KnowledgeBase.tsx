@@ -22,40 +22,13 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ role = 'admin', on
     threshold: 0.3
   }), [solutions]);
 
-  const [filteredSolutions, setFilteredSolutions] = useState<Solution[]>([]);
-  const [isSearchingAI, setIsSearchingAI] = useState(false);
-
-  useEffect(() => {
-    const performSearch = async () => {
-        if (!searchTerm.trim()) {
-            setFilteredSolutions(solutions);
-            return;
-        }
-
-        // We use fuse for immediate fuzzy results
-        const fuzzyResults = fuse.search(searchTerm).map(r => r.item);
-        setFilteredSolutions(fuzzyResults);
-
-        // Then we upgrade to semantic AI search if it's more than a few characters
-        if (searchTerm.length > 3) {
-            setIsSearchingAI(true);
-            try {
-                const semanticResults = await window.electronAPI.semanticSearchKb(searchTerm, solutions);
-                setFilteredSolutions(semanticResults);
-            } catch (e) {
-                console.error("AI Search failed", e);
-            } finally {
-                setIsSearchingAI(false);
-            }
-        }
-    };
-    performSearch();
-  }, [searchTerm, solutions, fuse]);
-
+  const filteredSolutions = useMemo(() => {
+    if (!searchTerm.trim()) return solutions;
+    return fuse.search(searchTerm).map(r => r.item);
+  }, [solutions, searchTerm, fuse]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newProblem, setNewProblem] = useState('');
   const [newSolution, setNewSolution] = useState('');
-  const [newActions, setNewActions] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -80,8 +53,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ role = 'admin', on
         const solutionData = {
             problemDescription: newProblem,
             solutionDescription: newSolution,
-            actions: [], // Manual entry has no recorded actions
-            executableActions: newActions.split('\n').map(s => s.trim()).filter(Boolean)
+            actions: [] // Manual entry has no recorded actions
         };
         const created = await window.electronAPI.createSolution(solutionData);
         setSolutions(prev => [created, ...prev]);
@@ -113,21 +85,16 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ role = 'admin', on
       <div className="relative">
         <input
           type="text"
-          placeholder="Search for solutions using natural language (AI-powered)..."
+          placeholder="Search for solutions..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-12 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent transition-all"
+          className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent transition-all"
         />
         <div className="absolute left-3 top-3.5 text-slate-400">
            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
            </svg>
         </div>
-        {isSearchingAI && (
-            <div className="absolute right-4 top-3.5">
-                <SpinnerIcon className="w-5 h-5 text-brand-primary animate-spin" />
-            </div>
-        )}
       </div>
 
       {isLoading ? (
@@ -200,16 +167,6 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ role = 'admin', on
                             rows={4}
                             placeholder="Describe the steps to fix this problem..."
                             className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-primary outline-none transition-all resize-none"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-1">Executable Actions (One per line)</label>
-                        <textarea
-                            value={newActions}
-                            onChange={(e) => setNewActions(e.target.value)}
-                            rows={2}
-                            placeholder="e.g., uptime"
-                            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-primary outline-none transition-all font-mono text-xs"
                         />
                     </div>
                 </div>

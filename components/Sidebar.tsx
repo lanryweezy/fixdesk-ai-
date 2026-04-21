@@ -1,6 +1,6 @@
 import React from 'react';
 import { Page } from '../App';
-import { ChartBarIcon, TicketIcon, BrainCircuit, ComputerDesktopIcon, ShieldCheckIcon, UserGroupIcon, Cog8ToothIcon, CogIcon } from './icons/Icons';
+import { ChartBarIcon, TicketIcon, BrainCircuit, ComputerDesktopIcon, ShieldCheckIcon, UserGroupIcon, Cog8ToothIcon } from './icons/Icons';
 
 import { Ticket, TicketStatus } from '../types';
 
@@ -19,13 +19,14 @@ const navItems = [
   { name: 'Tickets', icon: TicketIcon, page: 'tickets', roles: ['staff', 'admin'] },
   { name: 'Knowledge Base', icon: BrainCircuit, page: 'knowledge-base', roles: ['staff', 'admin'] },
   { name: 'Help & Support', icon: UserGroupIcon, page: 'start-remote-session', roles: ['staff'] },
+  { name: 'My Tickets', icon: TicketIcon, page: 'tickets', roles: ['staff', 'admin'] },
+  { name: 'Knowledge Base', icon: BrainCircuit, page: 'knowledge-base', roles: ['staff', 'admin'] },
+  { name: 'Start Remote Session', icon: UserGroupIcon, page: 'start-remote-session', roles: ['staff'] },
   { name: 'Settings', icon: Cog8ToothIcon, page: 'settings', roles: ['staff', 'admin'] },
 ];
 
 const adminNavItems = [
     { name: 'Remote Control', icon: ShieldCheckIcon, page: 'remote', roles: ['admin'] },
-    { name: 'Automation Rules', icon: CogIcon, page: 'automation-rules', roles: ['admin'] },
-    { name: 'Security & Audit', icon: ShieldCheckIcon, page: 'security-center', roles: ['admin'] },
 ]
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReportIssue, role, onRoleToggle, tickets, userName }) => {
@@ -33,12 +34,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
   const staffActiveCount = tickets.filter(t => t.reportedBy === userName && t.status !== TicketStatus.RESOLVED && t.status !== TicketStatus.AI_RESOLVED).length;
 
   return (
-    <div className="w-64 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col p-5">
-      <div className="flex items-center gap-3 px-2 mb-10">
-        <div className="p-1.5 bg-brand-primary rounded-xl shadow-lg shadow-brand-primary/20">
-            <BrainCircuit className="h-6 w-6 text-white" />
-        </div>
-        <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">FixDesk <span className="text-brand-primary">AI</span></h1>
+    <div className="w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col p-4">
+      <div className="flex items-center gap-2 px-2 mb-8">
+        <BrainCircuit className="h-8 w-8 text-brand-primary" />
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">FixDesk AI</h1>
       </div>
       
       <nav className="flex-1 flex flex-col justify-between">
@@ -51,7 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
             Report an Issue
           </button>
           
-          <ul className="mt-10 space-y-1">
+          <ul className="mt-8 space-y-2">
             {navItems.filter(item => item.roles.includes(role)).map((item) => (
               <li key={item.name}>
                 <a
@@ -62,15 +61,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
                   }}
                   className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     currentPage === item.page
-                      ? 'bg-white dark:bg-slate-800 text-brand-primary shadow-sm ring-1 ring-slate-200 dark:ring-slate-700'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                      ? 'bg-brand-primary/10 text-brand-primary'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
                   }`}
                 >
-                  <item.icon className={`w-5 h-5 transition-colors ${currentPage === item.page ? 'text-brand-primary' : 'text-slate-400 group-hover:text-slate-600'}`} />
+                  <item.icon className="w-6 h-6" />
                   <span className="flex-1">{item.name}</span>
                   {item.page === 'tickets' && (
-                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black ${
-                        currentPage === 'tickets' ? 'bg-brand-primary text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        currentPage === 'tickets' ? 'bg-brand-primary text-white' : 'bg-slate-200 text-slate-600'
                     }`}>
                         {role === 'admin' ? unassignedCount : staffActiveCount}
                     </span>
@@ -81,9 +80,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
           </ul>
 
           {role === 'admin' && (
-            <div className="mt-10">
-                <p className="px-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-4">Systems Admin</p>
-                <ul className="space-y-1">
+            <div className="mt-8">
+                <p className="px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Admin Tools</p>
+                <ul className="mt-2 space-y-2">
                     {adminNavItems.map((item) => (
                         <li key={item.name}>
                         <a
@@ -108,21 +107,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
           )}
         </div>
 
-        <div className="space-y-5">
+        <div className="space-y-4">
             <button
                 onClick={onRoleToggle}
-                className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-brand-primary transition-all group"
+                className="w-full flex items-center justify-between px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg transition-colors group"
             >
                 <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full animate-pulse ${role === 'admin' ? 'bg-indigo-500' : 'bg-emerald-500'}`}></div>
-                    <span className="text-xs font-bold text-slate-600 dark:text-slate-200 uppercase tracking-widest">{role} Mode</span>
+                    <div className={`w-2 h-2 rounded-full ${role === 'admin' ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200 capitalize">{role} Mode</span>
                 </div>
-                <span className="text-[10px] font-black text-slate-400 group-hover:text-brand-primary uppercase">Switch</span>
+                <span className="text-xs text-slate-400 group-hover:text-brand-primary">Switch</span>
             </button>
 
-            <div className="p-5 bg-gradient-to-br from-brand-primary to-brand-secondary rounded-2xl text-white shadow-xl shadow-brand-primary/20">
-                <p className="text-xs font-bold opacity-90 leading-relaxed">
-                    FixDesk AI is actively monitoring your workspace for anomalies.
+            <div className="p-4 bg-slate-100 dark:bg-slate-700 rounded-lg text-center">
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Having trouble? Our AI is here to help you get back on track, fast.
                 </p>
             </div>
         </div>

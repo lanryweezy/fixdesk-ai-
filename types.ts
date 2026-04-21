@@ -70,6 +70,8 @@ export interface BackupConfig {
   lastBackupAt?: string;
   retentionDays: number;
   provider: 'local' | 's3';
+  activities?: Activity[];
+  attachments?: { name: string; url: string }[];
 }
 
 export interface RecordedAction {

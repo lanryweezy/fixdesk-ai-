@@ -18,33 +18,20 @@ const StatusBadge: React.FC<{ status: TicketStatus }> = ({ status }) => {
   return <span className={`${baseClasses} ${statusClasses[status]}`}>{status}</span>;
 };
 
-const PriorityBadge: React.FC<{ priority: 'Low' | 'Medium' | 'High' }> = ({ priority }) => {
+const PriorityBadge: React.FC<{ priority: 'Low' | 'Medium' | 'High' | 'Urgent' }> = ({ priority }) => {
     const priorityClasses = {
         'Low': 'text-slate-500',
         'Medium': 'text-amber-600',
-        'High': 'text-red-600'
+        'High': 'text-red-600',
+        'Urgent': 'text-red-800 font-bold'
     };
     return <span className={`font-medium ${priorityClasses[priority]}`}>{priority}</span>
 }
 
-const SentimentBadge: React.FC<{ sentiment?: 'Frustrated' | 'Neutral' | 'Positive' }> = ({ sentiment }) => {
-    if (!sentiment) return null;
-    const icons = {
-        'Frustrated': '😠',
-        'Neutral': '😐',
-        'Positive': '😊'
-    };
-    const colors = {
-        'Frustrated': 'text-red-500 bg-red-50',
-        'Neutral': 'text-slate-500 bg-slate-50',
-        'Positive': 'text-green-500 bg-green-50'
-    };
-    return (
-        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${colors[sentiment]}`}>
-            {icons[sentiment]} {sentiment.toUpperCase()}
-        </span>
-    );
-};
+const CategoryBadge: React.FC<{ category: 'Hardware' | 'Software' | 'Network' | 'Account' | 'Other' }> = ({ category }) => {
+    const categoryClasses = 'px-2 py-0.5 text-xs font-medium rounded-full inline-block bg-gray-100 text-gray-700';
+    return <span className={categoryClasses}>{category}</span>
+}
 
 interface TicketItemProps {
   ticket: Ticket;
@@ -77,6 +64,7 @@ const TicketItem: React.FC<TicketItemProps> = ({ ticket, onSelect }) => {
                 <span className="font-medium">{ticket.reportedBy}</span>
             </div>
             <div className='flex items-center gap-4'>
+                <CategoryBadge category={ticket.category} />
                 <PriorityBadge priority={ticket.priority} />
                 {(ticket.status === TicketStatus.AI_RESOLVED || ticket.status === TicketStatus.SELF_HEALED) && <CogIcon className="w-5 h-5 text-purple-500" title="Resolved by AI" />}
             </div>
@@ -90,18 +78,15 @@ interface TicketsListProps {
   tickets: Ticket[];
   onSelectTicket: (ticket: Ticket) => void;
   role?: 'staff' | 'admin';
-  userName?: string;
   onRefresh?: () => void;
 }
 
-export const TicketsList: React.FC<TicketsListProps> = ({ tickets, onSelectTicket, role = 'admin', userName = 'Alex Smith', onRefresh }) => {
+export const TicketsList: React.FC<TicketsListProps> = ({ tickets, onSelectTicket, role = 'admin', onRefresh }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<TicketStatus | 'All'>('All');
   const [priorityFilter, setPriorityFilter] = useState<'Low' | 'Medium' | 'High' | 'All'>('All');
-  const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | '30d' | 'All'>('All');
   const [sortBy, setSortBy] = useState<'Newest' | 'Oldest' | 'Priority'>('Newest');
   const [selectedTicketIds, setSelectedTicketIds] = useState<Set<string>>(new Set());
-  const [isAiProcessing, setIsAiProcessing] = useState(false);
 
   const fuse = useMemo(() => new Fuse(tickets, {
     keys: ['title', 'description', 'id', 'reportedBy'],
@@ -117,18 +102,10 @@ export const TicketsList: React.FC<TicketsListProps> = ({ tickets, onSelectTicke
 
     const filtered = result.filter(ticket => {
         // Role-based visibility: Staff only see their own tickets
-        const matchesRole = role === 'admin' || ticket.reportedBy === userName;
+        const matchesRole = role === 'admin' || ticket.reportedBy === 'Alex Smith'; // Mocked current user
         const matchesStatus = statusFilter === 'All' || ticket.status === statusFilter;
         const matchesPriority = priorityFilter === 'All' || ticket.priority === priorityFilter;
-
-        let matchesTime = true;
-        if (timeFilter !== 'All') {
-            const now = new Date().getTime();
-            const ranges = { '24h': 24 * 60 * 60 * 1000, '7d': 7 * 24 * 60 * 60 * 1000, '30d': 30 * 24 * 60 * 60 * 1000 };
-            matchesTime = (now - new Date(ticket.createdAt).getTime()) <= ranges[timeFilter];
-        }
-
-        return matchesRole && matchesStatus && matchesPriority && matchesTime;
+        return matchesRole && matchesStatus && matchesPriority;
     });
 
     const priorityMap = { 'High': 3, 'Medium': 2, 'Low': 1 };
@@ -156,24 +133,6 @@ export const TicketsList: React.FC<TicketsListProps> = ({ tickets, onSelectTicke
     }
     setSelectedTicketIds(new Set());
     if (onRefresh) onRefresh();
-  };
-
-  const handleAiSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchTerm.trim() || isAiProcessing) return;
-
-    setIsAiProcessing(true);
-    try {
-        const filters = await window.electronAPI.parseSearchQuery(searchTerm);
-        if (filters.status) setStatusFilter(filters.status);
-        if (filters.priority) setPriorityFilter(filters.priority);
-        if (filters.timeRange) setTimeFilter(filters.timeRange);
-        if (filters.keyword) setSearchTerm(filters.keyword);
-    } catch (error) {
-        console.error("AI Search failed:", error);
-    } finally {
-        setIsAiProcessing(false);
-    }
   };
 
   const handleExportCSV = () => {
@@ -216,28 +175,13 @@ export const TicketsList: React.FC<TicketsListProps> = ({ tickets, onSelectTicke
             )}
         </div>
         <div className="flex flex-wrap gap-3 w-full md:w-auto">
-            <form onSubmit={handleAiSearch} className="relative flex-1 md:flex-none min-w-[300px]">
-                <input
-                    type="text"
-                    placeholder="Ask AI (e.g. 'high priority vpn from today')..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-4 py-2 pr-10 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary transition-all"
-                />
-                <button
-                    type="submit"
-                    className="absolute right-2 top-1.5 p-1 text-slate-400 hover:text-brand-primary transition-colors"
-                    disabled={isAiProcessing}
-                >
-                    {isAiProcessing ? (
-                        <div className="w-4 h-4 border-2 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
-                    ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-                        </svg>
-                    )}
-                </button>
-            </form>
+            <input
+                type="text"
+                placeholder="Search tickets..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary min-w-[200px] flex-1 md:flex-none"
+            />
             <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
@@ -255,16 +199,6 @@ export const TicketsList: React.FC<TicketsListProps> = ({ tickets, onSelectTicke
                 <option value="Low">Low</option>
                 <option value="Medium">Medium</option>
                 <option value="High">High</option>
-            </select>
-            <select
-                value={timeFilter}
-                onChange={(e) => setTimeFilter(e.target.value as any)}
-                className="px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-primary"
-            >
-                <option value="All">Any Time</option>
-                <option value="24h">Last 24 Hours</option>
-                <option value="7d">Last 7 Days</option>
-                <option value="30d">Last 30 Days</option>
             </select>
             <select
                 value={sortBy}

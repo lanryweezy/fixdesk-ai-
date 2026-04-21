@@ -52,8 +52,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
   }, [chatHistory, isTyping]);
   const [summary, setSummary] = useState<string | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
-  const [rca, setRca] = useState<string | null>(null);
-  const [isAnalyzingRCA, setIsAnalyzingRCA] = useState(false);
 
   useEffect(() => {
     const fetchRecommendedSolutions = async () => {
@@ -272,73 +270,36 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
     }
   };
 
-  const handleRCA = async () => {
-    setIsAnalyzingRCA(true);
-    try {
-        const result = await window.electronAPI.rootCauseAnalysis(ticket);
-        setRca(result);
-        addToast('Root cause analysis complete', 'success');
-    } catch (error) {
-        addToast('Failed to perform RCA', 'error');
-    } finally {
-        setIsAnalyzingRCA(false);
-    }
-  };
-
   const handleAddInternalNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!internalNote.trim()) return;
 
-    const noteText = internalNote.trim();
-    const isAiMentioned = noteText.toLowerCase().includes('@ai');
-
     setIsUpdatingStatus(true);
     try {
-        const activities = [...(ticket.activities || [])];
-
-        // Add human note
-        const humanActivity: Activity = {
+        const activity: Activity = {
             id: Math.random().toString(36).substr(2, 9),
             timestamp: new Date().toISOString(),
             type: 'note',
-            message: `Internal Note: ${noteText}`,
+            message: `Internal Note: ${internalNote}`,
             user: 'Alex Smith'
         };
-        activities.push(humanActivity);
-
-        if (isAiMentioned) {
-            addToast('AI is processing your mention...', 'info');
-            const question = noteText.replace(/@ai/gi, '').trim() || 'Please provide technical advice for this ticket.';
-            const aiResponse = await window.electronAPI.askAboutTicket(ticket, question);
-
-            const aiActivity: Activity = {
-                id: Math.random().toString(36).substr(2, 9),
-                timestamp: new Date().toISOString(),
-                type: 'note',
-                message: `**AI Assistant response to mention:**\n\n${aiResponse}`,
-                user: 'FixDesk AI'
-            };
-            activities.push(aiActivity);
-        }
-
         const updatedTicket = await window.electronAPI.updateTicket({
             ...ticket,
-            activities
+            activities: [...(ticket.activities || []), activity]
         });
-
         setTicket(updatedTicket);
         if (onUpdate) onUpdate(updatedTicket);
         setInternalNote('');
-        addToast(isAiMentioned ? 'AI responded to note' : 'Internal note added', 'success');
+        addToast('Internal note added', 'success');
     } catch (error) {
-        addToast('Failed to add internal note or AI failed to respond', 'error');
+        addToast('Failed to add internal note', 'error');
     } finally {
         setIsUpdatingStatus(false);
     }
   };
 
   const {
-    id, title, description, status, reportedBy, assignedTo, createdAt, resolution, logs, videoUrl
+    id, title, description, status, reportedBy, assignedTo, createdAt, resolution, logs, videoUrl, priority, category
   } = ticket;
 
   return (
@@ -357,24 +318,14 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
             <div className="flex items-center gap-3">
                 <p className="text-sm text-slate-500">{id}</p>
                 {role === 'admin' && (
-                    <div className="flex items-center gap-4">
-                        <button
-                            onClick={handleSummarize}
-                            disabled={isSummarizing}
-                            className="flex items-center gap-1.5 text-xs font-bold text-brand-primary hover:text-brand-secondary transition-colors"
-                        >
-                            <ListBulletIcon className="w-3.5 h-3.5" />
-                            {isSummarizing ? 'Summarizing...' : 'AI Summary'}
-                        </button>
-                        <button
-                            onClick={handleRCA}
-                            disabled={isAnalyzingRCA}
-                            className="flex items-center gap-1.5 text-xs font-bold text-brand-primary hover:text-brand-secondary transition-colors"
-                        >
-                            <BrainCircuit className="w-3.5 h-3.5" />
-                            {isAnalyzingRCA ? 'Analyzing...' : 'Root Cause Analysis'}
-                        </button>
-                    </div>
+                    <button
+                        onClick={handleSummarize}
+                        disabled={isSummarizing}
+                        className="flex items-center gap-1.5 text-xs font-bold text-brand-primary hover:text-brand-secondary transition-colors"
+                    >
+                        <ListBulletIcon className="w-3.5 h-3.5" />
+                        {isSummarizing ? 'Summarizing...' : 'AI Summary'}
+                    </button>
                 )}
             </div>
             <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100 mt-1">{title}</h2>
@@ -417,8 +368,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
             </div>
           </div>
           <div>
-            <h4 className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Date Created</h4>
-            <p className="text-slate-700 font-medium">{new Date(createdAt).toLocaleString()}</p>
+            <h4 className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Priority</h4>
+            <p className="text-slate-700 font-medium">{priority}</p>
           </div>
         </div>
 
@@ -430,18 +381,6 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initialTicke
                     FixDesk AI Summary
                 </h3>
                 <p className="text-sm text-amber-900 dark:text-amber-200 italic leading-relaxed">{summary}</p>
-             </div>
-          )}
-
-          {rca && (
-             <div className="p-6 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700/50 rounded-xl">
-                <h3 className="text-xs font-bold text-indigo-800 dark:text-indigo-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <BrainCircuit className="w-4 h-4" />
-                    Technical Root Cause Analysis
-                </h3>
-                <div className="prose dark:prose-invert max-w-none prose-sm prose-indigo">
-                    <ReactMarkdown>{rca}</ReactMarkdown>
-                </div>
              </div>
           )}
 

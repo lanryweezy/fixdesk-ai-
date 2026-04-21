@@ -4,8 +4,7 @@ import Peer from 'simple-peer';
 import { RecordedAction, Solution } from '../types';
 import { SaveSolutionModal } from './SaveSolutionModal';
 import { useToast } from '../services/ToastContext';
-import { SpinnerIcon, ComputerDesktopIcon, ShieldCheckIcon, VideoCameraIcon, StopIcon, DocumentCheckIcon } from './icons/Icons';
-import { Card } from './common/Card';
+import { SpinnerIcon } from './icons/Icons';
 
 interface RemoteControlViewProps {
     ticketId?: string;
@@ -16,7 +15,24 @@ export const RemoteControlView: React.FC<RemoteControlViewProps> = ({ ticketId }
     const [offer, setOffer] = useState('');
     const [answer, setAnswer] = useState('');
     const [isPolling, setIsPolling] = useState(false);
+
     const [isConnected, setIsConnected] = useState(false);
+
+    useEffect(() => {
+        if (ticketId && !isConnected && !offer) {
+            setIsPolling(true);
+            const interval = setInterval(async () => {
+                const session = await window.electronAPI.getRemoteSession(ticketId);
+                if (session?.offer) {
+                    setOffer(session.offer);
+                    addToast('Received remote session offer', 'success');
+                    clearInterval(interval);
+                    setIsPolling(false);
+                }
+            }, 3000);
+            return () => clearInterval(interval);
+        }
+    }, [ticketId, isConnected, offer]);
     const [isRecording, setIsRecording] = useState(false);
     const [recordedActions, setRecordedActions] = useState<RecordedAction[]>([]);
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -83,7 +99,8 @@ export const RemoteControlView: React.FC<RemoteControlViewProps> = ({ ticketId }
             peerRef.current = peer;
 
         } catch (error) {
-            addToast("Invalid offer format.", 'error');
+            addToast("Invalid offer format. Please ensure you've copied it correctly.", 'error');
+            console.error("Error accepting offer:", error);
         }
     };
 
@@ -228,31 +245,59 @@ export const RemoteControlView: React.FC<RemoteControlViewProps> = ({ ticketId }
     }
 
     return (
-        <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <header className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Admin Remote Access</h1>
-                    <p className="text-slate-500 dark:text-slate-400 font-medium">Establish a secure Peer-to-Peer connection to assist an employee.</p>
-                </div>
-                <div className="p-3 bg-brand-primary/10 rounded-2xl">
-                    <ShieldCheckIcon className="w-8 h-8 text-brand-primary" />
-                </div>
-            </header>
-
+        <div className="p-8 font-sans">
+            <h1 className="text-2xl font-bold mb-4">Accept Remote Session</h1>
             {ticketId && (
-                <div className="p-4 bg-brand-primary/5 border border-brand-primary/20 rounded-2xl flex items-center gap-4">
-                    <div className="px-3 py-1 bg-brand-primary text-white text-[10px] font-black uppercase rounded-lg">Target Ticket</div>
-                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{ticketId}</span>
+                <div className="mb-6 p-4 bg-purple-50 border-l-4 border-purple-400 text-purple-700">
+                    <p className="font-semibold">Assisting with Ticket: {ticketId}</p>
                 </div>
             )}
+            {isPolling && (
+                <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">
+                    <SpinnerIcon className="w-5 h-5 animate-spin text-yellow-600" />
+                    <p className="text-sm text-yellow-700 font-medium">Waiting for user to start sharing their screen...</p>
+                </div>
+            )}
+            <div className="space-y-6">
+                {!ticketId && (
+                    <div>
+                        <h2 className="text-lg font-semibold">Step 1: Paste User's Offer</h2>
+                        <textarea
+                            value={offer}
+                            onChange={(e) => setOffer(e.target.value)}
+                            className="w-full h-32 p-2 mt-1 border rounded"
+                            placeholder="Paste the offer from the user here..."
+                        />
+                        <button
+                            onClick={handleAcceptOffer}
+                            disabled={!offer || !!answer}
+                            className="mt-2 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400"
+                        >
+                            Accept & Generate Answer
+                        </button>
+                    </div>
+                )}
+                {ticketId && offer && !isConnected && !answer && (
+                    <div>
+                         <button
+                            onClick={handleAcceptOffer}
+                            className="bg-brand-primary hover:bg-brand-primary/90 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all"
+                        >
+                            Connect to User's Screen
+                        </button>
+                    </div>
+                )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                 <Card className="flex flex-col">
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-500">
-                            <ComputerDesktopIcon className="w-5 h-5" />
-                        </div>
-                        <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">1. Accept Offer</h2>
+                {answer && !ticketId && (
+                    <div>
+                        <h2 className="text-lg font-semibold">Step 2: Send Answer to User</h2>
+                        <p className="text-sm text-gray-600">Copy this answer and send it back to the user:</p>
+                        <textarea
+                            readOnly
+                            value={answer}
+                            className="w-full h-32 p-2 mt-1 border rounded bg-gray-100"
+                            onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+                        />
                     </div>
 
                     {isPolling ? (

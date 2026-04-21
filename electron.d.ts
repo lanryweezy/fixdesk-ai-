@@ -9,7 +9,6 @@ export interface ElectronApi {
       updateTicket: (ticket: Ticket) => Promise<Ticket>;
     getTicketById: (id: string) => Promise<Ticket | undefined>;
     executeCommand: (commands: string[]) => Promise<{ stdout: string; stderr: string }>;
-    getSystemMetrics: () => Promise<{ cpuUsage: number; memUsage: number; diskUsage: number }>;
     getSolutions: () => Promise<Solution[]>;
     createSolution: (solution: Omit<Solution, 'id'>) => Promise<Solution>;
     findSolutions: (problemDescription: string) => Promise<Solution[]>;
@@ -20,28 +19,18 @@ export interface ElectronApi {
     updateSettings: (settings: Partial<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string, aiOpsPolicy: string, autoLaunch: boolean, geminiApiKey?: string }>) => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string, aiOpsPolicy: string, autoLaunch: boolean, geminiApiKey?: string }>;
     generateMockData: () => Promise<boolean>;
     exportSupportBundle: () => Promise<boolean>;
-    exportAuditReport: (format?: 'json' | 'csv') => Promise<boolean>;
-    getAuditLogs: () => Promise<any[]>;
+    getSettings: () => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string }>;
+    updateSettings: (settings: Partial<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string }>) => Promise<{ role: 'staff' | 'admin', isDarkMode: boolean, userName: string, userAvatar: string, activeWorkspaceId: string }>;
+    generateMockData: () => Promise<boolean>;
     getSystemDiagnostics: () => Promise<any>;
-    getAutomationRules: () => Promise<AutomationRule[]>;
-    updateAutomationRule: (rule: AutomationRule) => Promise<AutomationRule>;
-    createAutomationRule: (rule: Omit<AutomationRule, 'id' | 'executionCount'>) => Promise<AutomationRule>;
-    deleteAutomationRule: (id: string) => Promise<boolean>;
-    aiChat: (message: string, history: any[], screenshot?: string) => Promise<string>;
-    categorizeAndPrioritize: (title: string, description: string) => Promise<{ priority: 'Low' | 'Medium' | 'High', category: string, sentiment: 'Frustrated' | 'Neutral' | 'Positive' }>;
+    categorizeAndPrioritize: (title: string, description: string) => Promise<{ priority: 'Low' | 'Medium' | 'High', category: string }>;
     askAboutTicket: (ticket: Ticket, question: string) => Promise<string>;
     draftAiResponse: (ticket: Ticket) => Promise<string>;
     summarizeTicket: (ticket: Ticket) => Promise<string>;
     generateKbArticle: (ticket: Ticket) => Promise<string>;
     getSystemHealth: (tickets: Ticket[]) => Promise<{ status: string, summary: string, risks: string[] }>;
-    rootCauseAnalysis: (ticket: Ticket) => Promise<string>;
-    parseSearchQuery: (query: string) => Promise<{ status: any, priority: any, category: any, timeRange: any, keyword: any }>;
-    semanticSearchKb: (query: string, solutions: Solution[]) => Promise<Solution[]>;
-    analyzeSupportBundle: () => Promise<{ analysis: string, fileName: string } | null>;
     startConversation: (videoBase64: string, prompt: string) => Promise<any>;
-    testSSO: (config: any) => Promise<{ success: boolean, message: string }>;
     onAIOpsNotification: (callback: (data: { title: string, message: string }) => void) => void;
-    onNavigate: (callback: (page: string) => void) => void;
 }
 
 declare global {

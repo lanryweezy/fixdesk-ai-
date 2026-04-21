@@ -19,7 +19,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateTicket: (ticket: any) => ipcRenderer.invoke('db-update-ticket', ticket),
   getTicketById: (id: string) => ipcRenderer.invoke('db-get-ticket-by-id', id),
   executeCommand: (commands: string[]) => ipcRenderer.invoke('execute-command', commands),
-  getSystemMetrics: () => ipcRenderer.invoke('get-system-metrics'),
   getSolutions: () => ipcRenderer.invoke('db-get-solutions'),
   createSolution: (solution: any) => ipcRenderer.invoke('db-create-solution', solution),
   findSolutions: (problemDescription: string) => ipcRenderer.invoke('db-find-solutions', problemDescription),
@@ -40,6 +39,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // AI actions
   aiChat: (message: string, history: any[], screenshot?: string) => ipcRenderer.invoke('ai-chat', { message, history, screenshot }),
+  getSystemDiagnostics: () => ipcRenderer.invoke('get-system-diagnostics'),
+
+  // AI actions
   categorizeAndPrioritize: (title: string, description: string) => ipcRenderer.invoke('ai-categorize-prioritize', { title, description }),
   askAboutTicket: (ticket: any, question: string) => ipcRenderer.invoke('ai-ask-about-ticket', { ticket, question }),
   draftAiResponse: (ticket: any) => ipcRenderer.invoke('ai-draft-response', ticket),
@@ -52,6 +54,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   analyzeSupportBundle: () => ipcRenderer.invoke('ai-analyze-support-bundle'),
   startConversation: (videoBase64: string, prompt: string) => ipcRenderer.invoke('ai-start-conversation', { videoBase64, prompt }),
   testSSO: (config: any) => ipcRenderer.invoke('auth-test-sso', config),
+  startConversation: (videoBase64: string, prompt: string) => ipcRenderer.invoke('ai-start-conversation', { videoBase64, prompt }),
 
   // Event Listeners
   onAIOpsNotification: (callback: any) => ipcRenderer.on('aiops-notification', (_event, data) => callback(data)),

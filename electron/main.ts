@@ -1,10 +1,11 @@
-import { app, BrowserWindow, ipcMain, desktopCapturer, Tray, Menu, nativeImage, dialog, safeStorage, Notification } from 'electron'
+import { app, BrowserWindow, ipcMain, desktopCapturer, Tray, Menu, nativeImage, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, desktopCapturer, Tray, Menu, nativeImage } from 'electron'
 import * as path from 'node:path'
 import * as fs from 'node:fs'
 import robot from 'robotjs'
 import { Low } from 'lowdb'
-import { TextFile } from 'lowdb/node'
-import type { Ticket, Solution, RemoteSession, TicketStatus, AutomationRule } from '../types'
+import { JSONFilePreset } from 'lowdb/node'
+import type { Ticket, Solution, RemoteSession, TicketStatus } from '../types'
 import { exec } from 'child_process'
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import si from 'systeminformation'
@@ -34,15 +35,6 @@ type Data = {
   tickets: Ticket[];
   solutions: Solution[];
   remoteSessions: RemoteSession[];
-  automationRules: AutomationRule[];
-  auditLogs: {
-    id: string;
-    timestamp: string;
-    user: string;
-    command: string;
-    outcome: 'Success' | 'Failure' | 'Blocked';
-    reason?: string;
-  }[];
   settings: {
     role: 'staff' | 'admin';
     isDarkMode: boolean;
@@ -179,6 +171,11 @@ const initDatabase = async () => {
         await db.write();
         console.log('[Enterprise] Provisions applied from environment.');
     }
+            aiOpsPolicy: 'manual'
+        }
+    };
+    const dbPath = path.join(app.getPath('userData'), 'db.json');
+    db = await JSONFilePreset<Data>(dbPath, defaultData);
 }
 // --- End Database Setup ---
 
@@ -336,6 +333,30 @@ const triggerPassiveKbGeneration = async (ticket: Ticket) => {
         `;
         const result = await model.generateContent(prompt);
         const data = JSON.parse(result.response.text());
+});
+
+ipcMain.handle('db-update-ticket', async (event, updatedTicket: Ticket) => {
+    const index = db.data.tickets.findIndex(t => t.id === updatedTicket.id);
+    if (index !== -1) {
+        db.data.tickets[index] = updatedTicket;
+        await db.write();
+
+        // Passive Knowledge Acquisition: Auto-generate KB if resolved
+        if (updatedTicket.status === 'Resolved' || updatedTicket.status === 'AI Resolved' || updatedTicket.status === 'Self-Healed') {
+            triggerPassiveKbGeneration(updatedTicket);
+        }
+
+        return updatedTicket;
+    }
+    throw new Error('Ticket not found');
+});
+
+const triggerPassiveKbGeneration = async (ticket: Ticket) => {
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `Convert this resolved ticket into a professional KB article. Markdown only. TICKET: ${JSON.stringify(ticket)}`;
+        const result = await model.generateContent(prompt);
+        const article = result.response.text();
 
         const newSolution: Solution = {
             id: `SOL-AUTO-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
@@ -347,6 +368,9 @@ const triggerPassiveKbGeneration = async (ticket: Ticket) => {
                 const base = cmd.trim().split(' ')[0].toLowerCase();
                 return ALLOWED_COMMANDS.includes(base);
             })
+            problemDescription: ticket.title,
+            solutionDescription: article,
+            actions: []
         };
         db.data.solutions.push(newSolution);
         await db.write();
@@ -608,6 +632,24 @@ ipcMain.handle('ai-analyze-support-bundle', async (event) => {
         console.error("Support Bundle Analysis Error:", error);
         throw error;
     }
+    });
+
+    if (filePath) {
+        const diagnostics = await si.osInfo();
+        const bundle = {
+            exportedAt: new Date().toISOString(),
+            diagnostics: diagnostics,
+            settings: db.data.settings,
+            tickets: db.data.tickets,
+            solutions: db.data.solutions
+        };
+        fs.writeFileSync(filePath, JSON.stringify(bundle, null, 2));
+        return true;
+    }
+    return false;
+});
+
+    return db.data.settings;
 });
 
 ipcMain.handle('db-generate-mock-data', async () => {
@@ -683,6 +725,32 @@ ipcMain.handle('execute-command', async (event, commands: string[]) => {
     if (forbiddenChars.some(char => cmd.includes(char))) return false;
     const baseCmd = cmd.trim().split(' ')[0].toLowerCase();
     return ALLOWED_COMMANDS.includes(baseCmd);
+const ALLOWED_COMMANDS = ['ping', 'ifconfig', 'ipconfig', 'netstat', 'ls', 'dir', 'uptime', 'whoami', 'df', 'free'];
+
+ipcMain.handle('execute-command', async (event, commands: string[]) => {
+  const isAllowed = (cmd: string) => {
+    // 1. Check for command chaining characters
+    const forbiddenChars = [';', '&', '|', '>', '<', '`', '$', '(', ')'];
+    if (forbiddenChars.some(char => cmd.includes(char))) {
+        return false;
+    }
+
+    // 2. Check the base command against the whitelist
+    const baseCmd = cmd.trim().split(' ')[0].toLowerCase();
+    return ALLOWED_COMMANDS.includes(baseCmd);
+  };
+
+  const execPromise = (command: string) => {
+    if (!isAllowed(command)) {
+        return Promise.resolve({ stdout: '', stderr: `Blocked: Command '${command}' contains forbidden characters or is not in the whitelist.` });
+    }
+    return new Promise<{ stdout: string; stderr: string }>((resolve) => {
+      exec(command, (error, stdout, stderr) => {
+        // We resolve even if there's an error, but we include the stderr.
+        // The renderer process will be responsible for checking the stderr property.
+        resolve({ stdout, stderr });
+      });
+    });
   };
 
   const results = { stdout: '', stderr: '' };
@@ -759,6 +827,7 @@ ipcMain.handle('export-audit-report', async (event, format = 'json') => {
 
 // --- Gemini AI Handlers ---
 let genAI = new GoogleGenerativeAI(db?.data?.settings?.geminiApiKey || process.env.GEMINI_API_KEY || '');
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // --- Self-Healing Monitoring Service ---
 let monitoringInterval: NodeJS.Timeout | null = null;
@@ -791,6 +860,11 @@ const startMonitoring = () => {
 
             // Evaluation of custom Automation Rules for metrics
             await evaluateAutomationRules('SYSTEM_METRIC_THRESHOLD', { cpuUsage, memUsage, diskUsage });
+            // Thresholds for autonomous action
+            if (memUsage > 90 || cpuUsage > 90 || diskUsage > 90) {
+                console.log(`[AIOps] Critical metrics detected: CPU ${cpuUsage.toFixed(1)}%, Mem ${memUsage.toFixed(1)}%, Disk ${diskUsage.toFixed(1)}%`);
+                await triggerAutonomousResolution({ cpuUsage, memUsage, diskUsage });
+            }
         } catch (error) {
             console.error('[AIOps] Monitoring error:', error);
         }
@@ -814,6 +888,8 @@ const triggerAutonomousResolution = async (metrics: any) => {
             2. Suggest a safe, automated shell command to mitigate it.
                ALLOWED COMMANDS: ping, ifconfig, ipconfig, netstat, ls, dir, uptime, whoami, df, free, ps, top, pkill, systemctl, journalctl.
                Example: If a process 'bad_app' is consuming 90% CPU, suggest 'pkill bad_app'.
+            1. Diagnose the likely issue.
+            2. Suggest a safe, automated shell command to mitigate it (e.g., clearing temp files if disk is high, or identifying a runaway process).
             3. Provide a ticket title and description.
 
             Respond with ONLY a JSON object:
@@ -919,6 +995,10 @@ ipcMain.handle('ai-categorize-prioritize', async (event, { title, description })
             DESCRIPTION: ${description}
 
             Respond with JSON: { "priority": "Low" | "Medium" | "High", "category": "string", "sentiment": "Frustrated" | "Neutral" | "Positive" }`;
+        const prompt = `Analyze this IT request. Determine priority (Low, Medium, High) and a short category.
+            TITLE: ${title}
+            DESCRIPTION: ${description}
+            Respond with JSON: { "priority": "Low" | "Medium" | "High", "category": "string" }`;
         const result = await model.generateContent(prompt);
         return JSON.parse(result.response.text());
     } catch (error) {
@@ -957,11 +1037,13 @@ ipcMain.handle('ai-chat', async (event, { message, history, screenshot }) => {
     } catch (error: any) {
         console.error("AI Chat Error:", error);
         return `AI Error: ${error.message || "Unknown error occurred."}`;
+        return { priority: 'Medium', category: 'General' };
     }
 });
 
 ipcMain.handle('ai-ask-about-ticket', async (event, { ticket, question }) => {
     try {
+        if (!process.env.GEMINI_API_KEY) throw new Error('API key missing');
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `You are an IT support assistant. Answer the user question about this ticket.
 
@@ -985,6 +1067,7 @@ ipcMain.handle('ai-ask-about-ticket', async (event, { ticket, question }) => {
 
 ipcMain.handle('ai-draft-response', async (event, ticket) => {
     try {
+        if (!process.env.GEMINI_API_KEY) throw new Error('API key missing');
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `Draft a professional response for this ticket: ${JSON.stringify(ticket)}`;
         const result = await model.generateContent(prompt);
@@ -1223,6 +1306,7 @@ ipcMain.handle('ai-start-conversation', async (event, { videoBase64, prompt }) =
             parts.push({
                 inlineData: { mimeType: "video/webm", data: videoBase64 }
             } as any);
+            });
         }
 
         const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
