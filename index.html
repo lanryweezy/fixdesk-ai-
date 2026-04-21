@@ -23,14 +23,25 @@
           exportSupportBundle: () => Promise.resolve(true),
       };
       tailwind.config = {
+        darkMode: 'class',
         theme: {
           extend: {
             fontFamily: {
               sans: ['Inter', 'sans-serif'],
             },
             colors: {
-              'brand-primary': '#4F46E5',
-              'brand-secondary': '#6D28D9',
+              'brand-primary': '#6366f1',
+              'brand-secondary': '#4f46e5',
+              'brand-accent': '#818cf8',
+              slate: {
+                950: '#020617',
+              }
+            },
+            backgroundImage: {
+              'glass-gradient': 'linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05))',
+            },
+            boxShadow: {
+              'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
             }
           }
         }

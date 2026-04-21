@@ -47,11 +47,78 @@ type Data = {
   }
 }
 let db: Low<Data>;
+
+class EncryptedJSONAdapter {
+  private adapter: TextFile;
+  constructor(filename: string) {
+    this.adapter = new TextFile(filename);
+  }
+  async read(): Promise<Data | null> {
+    const text = await this.adapter.read();
+    if (!text) return null;
+    try {
+      if (safeStorage.isEncryptionAvailable()) {
+        const decrypted = safeStorage.decryptString(Buffer.from(text, 'base64'));
+        return JSON.parse(decrypted);
+      }
+      return JSON.parse(text);
+    } catch (e) {
+      // Fallback for non-encrypted data or error
+      return JSON.parse(text);
+    }
+  }
+  async write(data: Data): Promise<void> {
+    const text = JSON.stringify(data);
+    if (safeStorage.isEncryptionAvailable()) {
+      const encrypted = safeStorage.encryptString(text);
+      await this.adapter.write(encrypted.toString('base64'));
+    } else {
+      await this.adapter.write(text);
+    }
+  }
+}
+
 const initDatabase = async () => {
     const defaultData: Data = {
         tickets: [],
         solutions: [],
         remoteSessions: [],
+        automationRules: [
+            {
+                id: 'rule-vpn-frustrated',
+                workspaceId: 'DEFAULT',
+                name: 'VPN Frustration Escalation',
+                description: 'Automatically set high priority and assign to Senior Support if a VPN ticket detects frustrated sentiment.',
+                isEnabled: true,
+                trigger: 'TICKET_CREATED',
+                conditions: [
+                    { field: 'title', operator: 'contains', value: 'VPN' },
+                    { field: 'sentiment', operator: 'equals', value: 'Frustrated' }
+                ],
+                actions: [
+                    { type: 'SET_PRIORITY', params: { priority: 'High' } },
+                    { type: 'POST_NOTE', params: { message: 'AI: Escalating due to detected user frustration on a critical VPN issue.' } }
+                ],
+                executionCount: 0
+            },
+            {
+                id: 'rule-disk-low',
+                workspaceId: 'DEFAULT',
+                name: 'Auto-Clear Cache on Low Disk',
+                description: 'Execute cleanup when disk usage exceeds 85%.',
+                isEnabled: true,
+                trigger: 'SYSTEM_METRIC_THRESHOLD',
+                conditions: [
+                    { field: 'diskUsage', operator: 'greater_than', value: 85 }
+                ],
+                actions: [
+                    { type: 'EXECUTE_SHELL', params: { command: 'df -h' } },
+                    { type: 'POST_NOTE', params: { message: 'AI: Disk usage critical. Performed system health check.' } }
+                ],
+                executionCount: 0
+            }
+        ],
+        auditLogs: [],
         settings: {
             role: 'admin',
             isDarkMode: false,
@@ -60,6 +127,50 @@ const initDatabase = async () => {
             activeWorkspaceId: 'DEFAULT',
             aiOpsPolicy: 'manual',
             autoLaunch: true
+        }
+    };
+    const dbPath = path.join(app.getPath('userData'), 'db.enc.json');
+    const adapter = new EncryptedJSONAdapter(dbPath) as any;
+    db = new Low<Data>(adapter, defaultData);
+    await db.read();
+
+    // Start Scheduler
+    startScheduler();
+
+    // Decrypt API key if it exists
+    if (db.data.settings.geminiApiKey && safeStorage.isEncryptionAvailable()) {
+        try {
+            const encryptedBuffer = Buffer.from(db.data.settings.geminiApiKey, 'base64');
+            const decryptedKey = safeStorage.decryptString(encryptedBuffer);
+            genAI = new GoogleGenerativeAI(decryptedKey);
+        } catch (e) {
+            console.error('Failed to decrypt Gemini API Key:', e);
+        }
+    }
+
+    // --- Enterprise Provisioning (MDM / GPO Support) ---
+    // If an Admin provides keys via environment variables, they override local settings
+    const enterpriseApiKey = process.env.FIXDESK_API_KEY;
+    const enterpriseWorkspace = process.env.FIXDESK_WORKSPACE;
+    const enterprisePolicy = process.env.FIXDESK_AIOPS_POLICY as any;
+
+    if (enterpriseApiKey) {
+        genAI = new GoogleGenerativeAI(enterpriseApiKey);
+        db.data.settings.geminiApiKey = safeStorage.isEncryptionAvailable()
+            ? safeStorage.encryptString(enterpriseApiKey).toString('base64')
+            : enterpriseApiKey;
+    }
+    if (enterpriseWorkspace) {
+        db.data.settings.activeWorkspaceId = enterpriseWorkspace;
+    }
+    if (enterprisePolicy && ['autonomous', 'manual'].includes(enterprisePolicy)) {
+        db.data.settings.aiOpsPolicy = enterprisePolicy;
+    }
+
+    if (enterpriseApiKey || enterpriseWorkspace || enterprisePolicy) {
+        await db.write();
+        console.log('[Enterprise] Provisions applied from environment.');
+    }
             aiOpsPolicy: 'manual'
         }
     };
@@ -162,6 +273,10 @@ ipcMain.handle('db-create-ticket', async (event, ticket) => {
     const ticketWithWorkspace = { ...ticket, workspaceId: db.data.settings.activeWorkspaceId };
     db.data.tickets.push(ticketWithWorkspace);
     await db.write();
+
+    // Trigger Automation Rules
+    await evaluateAutomationRules('TICKET_CREATED', ticketWithWorkspace);
+
     return ticketWithWorkspace;
 });
 
@@ -192,6 +307,51 @@ ipcMain.handle('db-update-ticket', async (event, updatedTicket: Ticket) => {
 });
 
 const triggerPassiveKbGeneration = async (ticket: Ticket) => {
+    if (!genAI) return;
+    try {
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
+        const prompt = `
+            Convert this resolved IT support ticket into a professional Knowledge Base solution object.
+            TICKET: ${JSON.stringify(ticket)}
+
+            Respond with JSON:
+            {
+                "problemDescription": "string",
+                "solutionDescription": "markdown string",
+                "tags": ["string"],
+                "executableActions": ["string"]
+            }
+
+            Guidelines:
+            - problemDescription should be a clear, searchable summary of the issue.
+            - solutionDescription should use markdown and be concise.
+            - tags should be relevant technical keywords.
+            - executableActions should be shell commands from this whitelist ONLY: [ping, ifconfig, ipconfig, netstat, ls, dir, uptime, whoami, df, free, ps, top, pkill, systemctl, journalctl].
+        `;
+        const result = await model.generateContent(prompt);
+        const data = JSON.parse(result.response.text());
+});
+
+ipcMain.handle('db-update-ticket', async (event, updatedTicket: Ticket) => {
+    const index = db.data.tickets.findIndex(t => t.id === updatedTicket.id);
+    if (index !== -1) {
+        db.data.tickets[index] = updatedTicket;
+        await db.write();
+
+        // Passive Knowledge Acquisition: Auto-generate KB if resolved
+        if (updatedTicket.status === 'Resolved' || updatedTicket.status === 'AI Resolved' || updatedTicket.status === 'Self-Healed') {
+            triggerPassiveKbGeneration(updatedTicket);
+        }
+
+        return updatedTicket;
+    }
+    throw new Error('Ticket not found');
+});
+
+const triggerPassiveKbGeneration = async (ticket: Ticket) => {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `Convert this resolved ticket into a professional KB article. Markdown only. TICKET: ${JSON.stringify(ticket)}`;
@@ -201,6 +361,13 @@ const triggerPassiveKbGeneration = async (ticket: Ticket) => {
         const newSolution: Solution = {
             id: `SOL-AUTO-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
             workspaceId: ticket.workspaceId,
+            problemDescription: data.problemDescription || ticket.title,
+            solutionDescription: data.solutionDescription,
+            tags: data.tags || [],
+            executableActions: (data.executableActions || []).filter((cmd: string) => {
+                const base = cmd.trim().split(' ')[0].toLowerCase();
+                return ALLOWED_COMMANDS.includes(base);
+            })
             problemDescription: ticket.title,
             solutionDescription: article,
             actions: []
@@ -266,15 +433,135 @@ ipcMain.handle('db-delete-remote-session', async (event, ticketId) => {
     await db.write();
 });
 
+// --- Automation Rules Handlers ---
+ipcMain.handle('db-get-automation-rules', () => {
+    return db.data.automationRules.filter(r => r.workspaceId === db.data.settings.activeWorkspaceId);
+});
+
+ipcMain.handle('db-update-automation-rule', async (event, updatedRule: AutomationRule) => {
+    const index = db.data.automationRules.findIndex(r => r.id === updatedRule.id);
+    if (index !== -1) {
+        db.data.automationRules[index] = updatedRule;
+        await db.write();
+        return updatedRule;
+    }
+    throw new Error('Rule not found');
+});
+
+ipcMain.handle('db-create-automation-rule', async (event, rule: Omit<AutomationRule, 'id' | 'executionCount'>) => {
+    const newRule: AutomationRule = {
+        ...rule,
+        id: `rule-${Math.random().toString(36).substr(2, 9)}`,
+        workspaceId: db.data.settings.activeWorkspaceId,
+        executionCount: 0
+    };
+    db.data.automationRules.push(newRule);
+    await db.write();
+    return newRule;
+});
+
+ipcMain.handle('db-delete-automation-rule', async (event, id) => {
+    db.data.automationRules = db.data.automationRules.filter(r => r.id !== id);
+    await db.write();
+    return true;
+});
+
+const evaluateAutomationRules = async (trigger: string, context: any) => {
+    const activeRules = db.data.automationRules.filter(r => r.isEnabled && r.trigger === trigger && r.workspaceId === db.data.settings.activeWorkspaceId);
+
+    for (const rule of activeRules) {
+        const matches = rule.conditions.every(condition => {
+            const val = context[condition.field];
+            if (val === undefined) return false;
+
+            switch (condition.operator) {
+                case 'equals': return val === condition.value;
+                case 'contains': return String(val).toLowerCase().includes(String(condition.value).toLowerCase());
+                case 'greater_than': return Number(val) > Number(condition.value);
+                case 'less_than': return Number(val) < Number(condition.value);
+                default: return false;
+            }
+        });
+
+        if (matches) {
+            console.log(`[AIOps] Executing Automation Rule: ${rule.name}`);
+            for (const action of rule.actions) {
+                try {
+                    switch (action.type) {
+                        case 'SET_PRIORITY':
+                            if (context.id) {
+                                const ticket = db.data.tickets.find(t => t.id === context.id);
+                                if (ticket) ticket.priority = action.params.priority;
+                            }
+                            break;
+                        case 'POST_NOTE':
+                            if (context.id) {
+                                const ticket = db.data.tickets.find(t => t.id === context.id);
+                                if (ticket) {
+                                    ticket.activities?.push({
+                                        id: Math.random().toString(36).substr(2, 9),
+                                        timestamp: new Date().toISOString(),
+                                        type: 'note',
+                                        message: action.params.message,
+                                        user: 'FixDesk AI (Automation)'
+                                    });
+                                }
+                            }
+                            break;
+                        case 'EXECUTE_SHELL':
+                             // Whitelist check and execution
+                             const cmd = action.params.command;
+                             const baseCmd = cmd.trim().split(' ')[0].toLowerCase();
+                             if (ALLOWED_COMMANDS.includes(baseCmd)) {
+                                 exec(cmd);
+                             }
+                             break;
+                        // Add more actions as needed
+                    }
+                } catch (e) {
+                    console.error(`[AIOps] Action ${action.type} failed for rule ${rule.name}:`, e);
+                }
+            }
+            rule.executionCount++;
+            rule.lastExecutedAt = new Date().toISOString();
+            await db.write();
+        }
+    }
+};
+
+const startScheduler = () => {
+    setInterval(async () => {
+        const scheduledRules = db.data.automationRules.filter(r => r.isEnabled && r.trigger === 'SCHEDULED');
+        for (const rule of scheduledRules) {
+            // Logic: Execute if lastExecutedAt is not today (simplistic daily schedule)
+            const today = new Date().toDateString();
+            const lastRun = rule.lastExecutedAt ? new Date(rule.lastExecutedAt).toDateString() : null;
+
+            if (today !== lastRun) {
+                console.log(`[AIOps] Running Scheduled Rule: ${rule.name}`);
+                await evaluateAutomationRules('SCHEDULED', { timestamp: new Date().toISOString() });
+            }
+        }
+    }, 60000 * 60); // Check every hour
+};
+
 ipcMain.handle('db-get-settings', () => {
     return db.data.settings;
 });
 
 ipcMain.handle('db-update-settings', async (event, settings) => {
+    // Handle sensitive Gemini API Key with safeStorage
+    if (settings.geminiApiKey && safeStorage.isEncryptionAvailable()) {
+        const encryptedKey = safeStorage.encryptString(settings.geminiApiKey);
+        // We store it as a base64 string in the JSON DB
+        (settings as any).geminiApiKey = encryptedKey.toString('base64');
+    }
+
     db.data.settings = { ...db.data.settings, ...settings };
     await db.write();
 
     if (settings.geminiApiKey) {
+        // If it was just updated, we use the raw value passed in for this session
         genAI = new GoogleGenerativeAI(settings.geminiApiKey);
     }
 
@@ -293,6 +580,58 @@ ipcMain.handle('export-support-bundle', async () => {
         title: 'Export Support Bundle',
         defaultPath: path.join(app.getPath('downloads'), `fixdesk-support-${new Date().toISOString().split('T')[0]}.json`),
         filters: [{ name: 'JSON', extensions: ['json'] }]
+    });
+
+    if (filePath) {
+        const diagnostics = await si.osInfo();
+        const bundle = {
+            exportedAt: new Date().toISOString(),
+            diagnostics: diagnostics,
+            settings: db.data.settings,
+            tickets: db.data.tickets,
+            solutions: db.data.solutions
+        };
+        fs.writeFileSync(filePath, JSON.stringify(bundle, null, 2));
+        return true;
+    }
+    return false;
+});
+
+ipcMain.handle('ai-analyze-support-bundle', async (event) => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+        title: 'Select Support Bundle for AI Analysis',
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        properties: ['openFile']
+    });
+
+    if (canceled || filePaths.length === 0) return null;
+
+    try {
+        const bundleContent = fs.readFileSync(filePaths[0], 'utf-8');
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `
+            You are an expert Enterprise IT Systems Analyst. Analyze this FixDesk AI Support Bundle.
+            It contains system diagnostics, ticket history, and knowledge base solutions.
+
+            Perform the following:
+            1. **Pattern Recognition**: Identify recurring technical failures or user behavior patterns.
+            2. **Resolution Efficiency**: Assess if the existing solutions are actually solving the root causes.
+            3. **AIOps Health Score**: Provide a score from 0-100 on workspace automation and stability.
+            4. **Strategic Recommendations**: 3 high-impact actions for the IT team.
+
+            BUNDLE DATA (truncated if too large): ${bundleContent.substring(0, 30000)}
+
+            Respond in professional Markdown.
+        `;
+        const result = await model.generateContent(prompt);
+        return {
+            analysis: result.response.text(),
+            fileName: path.basename(filePaths[0])
+        };
+    } catch (error) {
+        console.error("Support Bundle Analysis Error:", error);
+        throw error;
+    }
     });
 
     if (filePath) {
@@ -369,6 +708,23 @@ ipcMain.handle('db-generate-mock-data', async () => {
 // --- End Database Handlers ---
 
 // --- Command Execution Handler ---
+const ALLOWED_COMMANDS = ['ping', 'ifconfig', 'ipconfig', 'netstat', 'ls', 'dir', 'uptime', 'whoami', 'df', 'free', 'ps', 'top', 'pkill', 'systemctl', 'journalctl'];
+
+const scrubPII = (text: string): string => {
+    if (!text) return text;
+    // Basic scrubbing for emails, IPs, and common potential secret patterns
+    let scrubbed = text.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[EMAIL_REDACTED]');
+    scrubbed = scrubbed.replace(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, '[IP_REDACTED]');
+    scrubbed = scrubbed.replace(/(password|secret|key|token|auth)=["']?[^"'\s]+["']?/gi, '$1=[REDACTED]');
+    return scrubbed;
+};
+
+ipcMain.handle('execute-command', async (event, commands: string[]) => {
+  const isAllowed = (cmd: string) => {
+    const forbiddenChars = [';', '&', '|', '>', '<', '`', '$', '(', ')'];
+    if (forbiddenChars.some(char => cmd.includes(char))) return false;
+    const baseCmd = cmd.trim().split(' ')[0].toLowerCase();
+    return ALLOWED_COMMANDS.includes(baseCmd);
 const ALLOWED_COMMANDS = ['ping', 'ifconfig', 'ipconfig', 'netstat', 'ls', 'dir', 'uptime', 'whoami', 'df', 'free'];
 
 ipcMain.handle('execute-command', async (event, commands: string[]) => {
@@ -399,15 +755,73 @@ ipcMain.handle('execute-command', async (event, commands: string[]) => {
 
   const results = { stdout: '', stderr: '' };
   for (const command of commands) {
-    const result = await execPromise(command);
-    results.stdout += result.stdout;
-    results.stderr += result.stderr;
-    // If there was an error in a command, stop executing the rest of the script.
-    if (result.stderr) {
-      break;
+    let outcome: 'Success' | 'Failure' | 'Blocked' = 'Success';
+    let reason: string | undefined;
+
+    if (!isAllowed(command)) {
+        outcome = 'Blocked';
+        reason = 'Security policy violation: forbidden characters or not whitelisted.';
+        results.stderr += `Blocked: ${command}`;
+    } else {
+        const res = await new Promise<{ stdout: string; stderr: string }>((resolve) => {
+            exec(command, (error, stdout, stderr) => resolve({ stdout, stderr }));
+        });
+        results.stdout += scrubPII(res.stdout);
+        results.stderr += scrubPII(res.stderr);
+        if (res.stderr) outcome = 'Failure';
     }
+
+    // Audit Log
+    db.data.auditLogs.push({
+        id: Math.random().toString(36).substr(2, 9),
+        timestamp: new Date().toISOString(),
+        user: db.data.settings.userName,
+        command: scrubPII(command),
+        outcome,
+        reason
+    });
+    await db.write();
+
+    if (results.stderr) break;
   }
   return results;
+});
+
+ipcMain.handle('db-get-audit-logs', () => {
+    return db.data.auditLogs.slice(-100).reverse(); // Return last 100 logs
+});
+
+ipcMain.handle('export-audit-report', async (event, format = 'json') => {
+    const isCsv = format === 'csv';
+    const { filePath } = await dialog.showSaveDialog({
+        title: `Export SOC2 Audit Report (${format.toUpperCase()})`,
+        defaultPath: path.join(app.getPath('downloads'), `soc2-audit-${new Date().toISOString().split('T')[0]}.${isCsv ? 'csv' : 'json'}`),
+        filters: [{ name: format.toUpperCase(), extensions: [format] }]
+    });
+
+    if (filePath) {
+        if (isCsv) {
+            const header = 'Timestamp,Operator,Command,Outcome,Reason\n';
+            const rows = db.data.auditLogs.map(log =>
+                `"${log.timestamp}","${log.user}","${log.command.replace(/"/g, '""')}","${log.outcome}","${(log.reason || '').replace(/"/g, '""')}"`
+            ).join('\n');
+            fs.writeFileSync(filePath, header + rows);
+            return true;
+        }
+        const report = {
+            exportedAt: new Date().toISOString(),
+            exportedBy: db.data.settings.userName,
+            workspaceId: db.data.settings.activeWorkspaceId,
+            auditLogs: db.data.auditLogs,
+            policies: {
+                aiOpsMode: db.data.settings.aiOpsPolicy,
+                commandWhitelist: ALLOWED_COMMANDS
+            }
+        };
+        fs.writeFileSync(filePath, JSON.stringify(report, null, 2));
+        return true;
+    }
+    return false;
 });
 // --- End Command Execution Handler ---
 
@@ -426,11 +840,26 @@ const startMonitoring = () => {
             const mem = await si.mem();
             const cpu = await si.currentLoad();
             const disk = await si.fsSize();
+            const processes = await si.processes();
 
             const memUsage = (mem.active / mem.total) * 100;
             const cpuUsage = cpu.currentLoad;
             const diskUsage = disk[0]?.use || 0;
 
+            // Top 5 processes by CPU
+            const topProcesses = processes.list
+                .sort((a, b) => b.cpu - a.cpu)
+                .slice(0, 5)
+                .map(p => ({ name: p.name, cpu: p.cpu, mem: p.mem, pid: p.pid }));
+
+            // Thresholds for autonomous action (lowered for demo purposes if needed, but keeping 90 for logic)
+            if (memUsage > 90 || cpuUsage > 90 || diskUsage > 90) {
+                console.log(`[AIOps] Critical metrics detected: CPU ${cpuUsage.toFixed(1)}%, Mem ${memUsage.toFixed(1)}%, Disk ${diskUsage.toFixed(1)}%`);
+                await triggerAutonomousResolution({ cpuUsage, memUsage, diskUsage, topProcesses });
+            }
+
+            // Evaluation of custom Automation Rules for metrics
+            await evaluateAutomationRules('SYSTEM_METRIC_THRESHOLD', { cpuUsage, memUsage, diskUsage });
             // Thresholds for autonomous action
             if (memUsage > 90 || cpuUsage > 90 || diskUsage > 90) {
                 console.log(`[AIOps] Critical metrics detected: CPU ${cpuUsage.toFixed(1)}%, Mem ${memUsage.toFixed(1)}%, Disk ${diskUsage.toFixed(1)}%`);
@@ -452,6 +881,13 @@ const triggerAutonomousResolution = async (metrics: any) => {
             Memory: ${metrics.memUsage.toFixed(1)}%
             Disk: ${metrics.diskUsage.toFixed(1)}%
 
+            TOP PROCESSES:
+            ${JSON.stringify(metrics.topProcesses)}
+
+            1. Diagnose the likely issue using the metrics and top processes.
+            2. Suggest a safe, automated shell command to mitigate it.
+               ALLOWED COMMANDS: ping, ifconfig, ipconfig, netstat, ls, dir, uptime, whoami, df, free, ps, top, pkill, systemctl, journalctl.
+               Example: If a process 'bad_app' is consuming 90% CPU, suggest 'pkill bad_app'.
             1. Diagnose the likely issue.
             2. Suggest a safe, automated shell command to mitigate it (e.g., clearing temp files if disk is high, or identifying a runaway process).
             3. Provide a ticket title and description.
@@ -513,6 +949,11 @@ const triggerAutonomousResolution = async (metrics: any) => {
                     newTicket.logs = [`Auto-fix output: ${stdout || stderr}`];
                     db.data.tickets.push(newTicket);
                     db.write();
+                    new Notification({
+                        title: 'FixDesk AIOps: Self-Healing Active',
+                        body: `Action Taken: ${aiResponse.diagnosis}`,
+                        icon: path.join(__dirname, '../assets/tray-icon.png')
+                    }).show();
                     win?.webContents.send('aiops-notification', { title: 'Self-Healing Action Taken', message: aiResponse.diagnosis });
                 });
             } else {
@@ -525,6 +966,11 @@ const triggerAutonomousResolution = async (metrics: any) => {
             db.data.tickets.push(newTicket);
             db.write();
             if (policy === 'manual' && aiResponse.mitigationCommand) {
+                new Notification({
+                    title: 'FixDesk AIOps: Attention Required',
+                    body: `AI suggests mitigation: ${aiResponse.diagnosis}`,
+                    icon: path.join(__dirname, '../assets/tray-icon.png')
+                }).show();
                 win?.webContents.send('aiops-notification', { title: 'AIOps Intervention Required', message: aiResponse.diagnosis });
             }
         }
@@ -540,6 +986,15 @@ ipcMain.handle('ai-categorize-prioritize', async (event, { title, description })
             model: "gemini-1.5-flash",
             generationConfig: { responseMimeType: "application/json" }
         });
+        const prompt = `Analyze this IT request.
+            1. Determine priority (Low, Medium, High).
+            2. Identify a short category (e.g., VPN, Software, Hardware).
+            3. Analyze user sentiment (Frustrated, Neutral, Positive).
+
+            TITLE: ${title}
+            DESCRIPTION: ${description}
+
+            Respond with JSON: { "priority": "Low" | "Medium" | "High", "category": "string", "sentiment": "Frustrated" | "Neutral" | "Positive" }`;
         const prompt = `Analyze this IT request. Determine priority (Low, Medium, High) and a short category.
             TITLE: ${title}
             DESCRIPTION: ${description}
@@ -548,6 +1003,40 @@ ipcMain.handle('ai-categorize-prioritize', async (event, { title, description })
         return JSON.parse(result.response.text());
     } catch (error) {
         console.error("AI Error:", error);
+        return { priority: 'Medium', category: 'General', sentiment: 'Neutral' };
+    }
+});
+
+ipcMain.handle('ai-chat', async (event, { message, history, screenshot }) => {
+    try {
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            systemInstruction: "You are a helpful IT Support Assistant for FixDesk AI. Your goal is to help employees solve technical issues. Be professional, concise, and friendly. If you cannot solve something, suggest they report an issue."
+        } as any);
+
+        const contents = [];
+        if (history) {
+            contents.push(...history);
+        }
+
+        const userParts: any[] = [{ text: message }];
+        if (screenshot) {
+            // screenshot is base64 string
+            userParts.push({
+                inlineData: {
+                    mimeType: "image/png",
+                    data: screenshot.split(',')[1] // Remove data:image/png;base64,
+                }
+            });
+        }
+
+        contents.push({ role: 'user', parts: userParts });
+
+        const result = await model.generateContent({ contents });
+        return result.response.text();
+    } catch (error: any) {
+        console.error("AI Chat Error:", error);
+        return `AI Error: ${error.message || "Unknown error occurred."}`;
         return { priority: 'Medium', category: 'General' };
     }
 });
@@ -624,6 +1113,23 @@ ipcMain.handle('get-system-diagnostics', async () => {
     }
 });
 
+ipcMain.handle('get-system-metrics', async () => {
+    try {
+        const cpu = await si.currentLoad();
+        const mem = await si.mem();
+        const disk = await si.fsSize();
+
+        return {
+            cpuUsage: Math.round(cpu.currentLoad),
+            memUsage: Math.round((mem.active / mem.total) * 100),
+            diskUsage: Math.round(disk[0]?.use || 0)
+        };
+    } catch (error) {
+        console.error('Metrics error:', error);
+        return { cpuUsage: 0, memUsage: 0, diskUsage: 0 };
+    }
+});
+
 ipcMain.handle('ai-generate-kb-article', async (event, ticket) => {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -674,6 +1180,89 @@ ipcMain.handle('ai-get-system-health', async (event, tickets) => {
     }
 });
 
+ipcMain.handle('ai-root-cause-analysis', async (event, ticket) => {
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `
+            Perform a deep technical root cause analysis (RCA) for the following IT ticket.
+            Consider the description, any provided diagnostics logs, and the activity history.
+
+            TICKET: ${JSON.stringify(ticket)}
+
+            Provide the analysis in markdown format with the following sections:
+            - **Root Cause Hypothesis**: What is the most likely technical cause?
+            - **Technical Deep Dive**: Explain the underlying system mechanism involved.
+            - **Long-term Prevention**: How to prevent this from recurring.
+            - **Confidence Level**: (Low, Medium, or High)
+        `;
+        const result = await model.generateContent(prompt);
+        return result.response.text();
+    } catch (error) {
+        console.error("RCA Error:", error);
+        return "Failed to perform root cause analysis.";
+    }
+});
+
+ipcMain.handle('ai-parse-search-query', async (event, query) => {
+    try {
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
+        const prompt = `
+            Parse the following natural language IT ticket search query into structured filter criteria.
+            QUERY: "${query}"
+
+            Respond with ONLY a JSON object:
+            {
+                "status": "New" | "In Progress" | "Resolved" | "AI Resolved" | "Needs Attention" | "Self-Healed" | null,
+                "priority": "Low" | "Medium" | "High" | null,
+                "category": "string" | null,
+                "timeRange": "24h" | "7d" | "30d" | null,
+                "keyword": "string" | null
+            }
+        `;
+        const result = await model.generateContent(prompt);
+        return JSON.parse(result.response.text());
+    } catch (error) {
+        console.error("Search Query Parsing Error:", error);
+        return { status: null, priority: null, category: null, timeRange: null, keyword: query };
+    }
+});
+
+ipcMain.handle('ai-semantic-search-kb', async (event, { query, solutions }) => {
+    try {
+        // In a real enterprise app, we'd use a vector DB.
+        // Here we use Gemini 1.5 Flash to re-rank the solutions based on semantic relevance to the query.
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const context = solutions.map((s: any) => ({ id: s.id, problem: s.problemDescription }));
+        const prompt = `
+            You are a semantic search engine. Given a list of IT Knowledge Base solutions and a user query,
+            rank the solutions by their semantic relevance to the query.
+
+            QUERY: "${query}"
+            SOLUTIONS: ${JSON.stringify(context)}
+
+            Respond with ONLY a JSON array of solution IDs in order of relevance: ["id1", "id2", ...]
+        `;
+
+        const result = await model.generateContent(prompt);
+        const rankedIds = JSON.parse(result.response.text());
+
+        // Return original solutions sorted by the AI's ranking
+        return rankedIds
+            .map((id: string) => solutions.find((s: any) => s.id === id))
+            .filter(Boolean);
+    } catch (error) {
+        console.error("Semantic Search Error:", error);
+        return solutions; // Fallback to original list
+    }
+});
+
 ipcMain.handle('ai-start-conversation', async (event, { videoBase64, prompt }) => {
     try {
         const model = genAI.getGenerativeModel({
@@ -695,6 +1284,7 @@ ipcMain.handle('ai-start-conversation', async (event, { videoBase64, prompt }) =
                     "resolution": "Step-by-step resolution steps",
                     "status": "Resolved",
                     "priority": "Low" | "Medium" | "High",
+                    "sentiment": "Frustrated" | "Neutral" | "Positive",
                     "suggestedScript": ["ls", "df"] // Optional shell commands from whitelist
                 }
             }
@@ -725,6 +1315,17 @@ ipcMain.handle('ai-start-conversation', async (event, { videoBase64, prompt }) =
         console.error("AI Conversation Error:", error);
         return { type: 'error', message: 'AI Analysis failed. Please try a manual description.' };
     }
+});
+
+ipcMain.handle('auth-test-sso', async (event, config: any) => {
+    // Simulated OIDC Discovery and Client Authentication
+    console.log('[Auth] Testing SSO Connection with:', config.discoveryUrl);
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    if (config.discoveryUrl && config.discoveryUrl.includes('company.com')) {
+        return { success: true, message: 'Connection established. Identity Provider verified.' };
+    }
+    return { success: false, message: 'Invalid Discovery URL or Client ID.' };
 });
 // --- End Gemini AI Handlers ---
 

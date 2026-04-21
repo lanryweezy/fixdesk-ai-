@@ -50,7 +50,10 @@ const TicketItem: React.FC<TicketItemProps> = ({ ticket, onSelect }) => {
     >
         <div>
             <div className="flex justify-between items-start">
-                <StatusBadge status={ticket.status} />
+                <div className="flex items-center gap-2">
+                    <StatusBadge status={ticket.status} />
+                    <SentimentBadge sentiment={ticket.sentiment} />
+                </div>
                 <span className="text-xs text-slate-400">{date}</span>
             </div>
             <h3 className="font-semibold text-slate-800 mt-2 truncate">{ticket.title}</h3>

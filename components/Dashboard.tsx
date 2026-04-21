@@ -3,6 +3,27 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Card } from './common/Card';
 import { mockAnalyticsData } from '../constants';
 import { Ticket, TicketStatus, Activity } from '../types';
+import { ITTerminal } from './ITTerminal';
+import ReactMarkdown from 'react-markdown';
+import { ChatBubbleBottomCenterTextIcon, BrainCircuit, ShieldCheckIcon, SpinnerIcon, CloudArrowDownIcon, DocumentTextIcon, XMarkIcon, ChartBarIcon } from './icons/Icons';
+import { useToast } from '../services/ToastContext';
+
+const PIE_COLORS = { 'FixDesk AI': '#4F46E5', 'IT Support Team': '#A78BFA' };
+
+const StatCard: React.FC<{ title: string; value: string | number; subtext: string; icon?: React.ReactNode }> = ({ title, value, subtext, icon }) => (
+  <Card className="relative overflow-hidden group hover:shadow-2xl hover:shadow-brand-primary/10 transition-all duration-300 ring-1 ring-slate-200 dark:ring-slate-800">
+    <div className="relative z-10">
+        <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">{title}</h3>
+            {icon && <div className="text-brand-primary opacity-20 group-hover:opacity-100 transition-opacity">{icon}</div>}
+        </div>
+        <p className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{value}</p>
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-2 flex items-center gap-1">
+            <span className="w-1 h-1 rounded-full bg-brand-primary"></span>
+            {subtext}
+        </p>
+    </div>
+    <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-brand-primary/5 rounded-full blur-2xl group-hover:bg-brand-primary/10 transition-colors"></div>
 import { ChatBubbleBottomCenterTextIcon, BrainCircuit, ShieldCheckIcon, SpinnerIcon } from './icons/Icons';
 
 const PIE_COLORS = { 'FixDesk AI': '#4F46E5', 'IT Support Team': '#A78BFA' };
@@ -22,6 +43,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', onFilterTickets }) => {
+  const { addToast } = useToast();
   const analytics = mockAnalyticsData;
   const [systemHealth, setSystemHealth] = React.useState<{ status: string, summary: string, risks: string[] } | null>(null);
   const [isLoadingHealth, setIsLoadingHealth] = React.useState(false);
@@ -243,6 +265,95 @@ export const Dashboard: React.FC<DashboardProps> = ({ tickets, role = 'admin', o
         <StatCard title="Automation Rate" value={`${stats.autoRate}%`} subtext="Resolved by FixDesk AI" />
         <StatCard title="Avg. Resolution Time" value={`${stats.avgResHours}h`} subtext="From creation to resolution" />
       </div>
+
+      {role === 'admin' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="bg-gradient-to-br from-slate-900 to-slate-800 border-none text-white overflow-hidden relative group">
+                  <div className="relative z-10 p-2">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-2 bg-white/10 rounded-xl">
+                                <ChartBarIcon className="w-6 h-6 text-brand-accent" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400">Human Hours Saved</h3>
+                                <p className="text-xs text-slate-500">Workspace Efficiency Index</p>
+                            </div>
+                        </div>
+                        <div className="flex items-end gap-4">
+                            <p className="text-6xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-brand-accent to-indigo-400">{stats.hoursSaved.toFixed(1)}h</p>
+                            <div className="mb-2">
+                                <span className="text-emerald-400 font-black text-sm flex items-center gap-1">
+                                    ↑ {((stats.hoursSaved / (stats.total || 1)) * 10).toFixed(1)}%
+                                </span>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase">vs Previous Period</p>
+                            </div>
+                        </div>
+                        <div className="mt-8 flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                <div className="h-full bg-brand-accent rounded-full" style={{ width: `${Math.min(100, stats.autoRate)}%` }}></div>
+                            </div>
+                            <span className="text-[10px] font-black text-slate-400 uppercase">{stats.autoRate}% AI Load</span>
+                        </div>
+                  </div>
+                  <div className="absolute -right-10 -top-10 w-64 h-64 bg-brand-primary opacity-10 blur-[100px] group-hover:opacity-20 transition-opacity"></div>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-indigo-900 to-brand-secondary border-none text-white overflow-hidden relative group">
+                  <div className="relative z-10 p-2">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-2 bg-white/10 rounded-xl">
+                                <ShieldCheckIcon className="w-6 h-6 text-emerald-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold uppercase tracking-widest text-indigo-200">AIOps Capital ROI</h3>
+                                <p className="text-xs text-indigo-300/60">Estimated Cost Reduction</p>
+                            </div>
+                        </div>
+                        <div className="flex items-end gap-4">
+                            <p className="text-6xl font-black tracking-tighter text-white">${stats.costSaved.toLocaleString()}</p>
+                            <div className="mb-2">
+                                <span className="px-2 py-0.5 bg-emerald-500 text-white font-black text-[10px] rounded uppercase">Optimized</span>
+                            </div>
+                        </div>
+                        <p className="mt-8 text-[11px] text-indigo-200/80 font-medium leading-relaxed">
+                            Calculated based on a standard blended IT labor rate of <span className="font-bold text-white">$85/hour</span> across all autonomously resolved and AI-assisted incidents.
+                        </p>
+                  </div>
+                   <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-emerald-500 opacity-10 blur-[100px] group-hover:opacity-20 transition-opacity"></div>
+              </Card>
+          </div>
+      )}
+
+      {role === 'admin' && selfHealedTickets.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-left duration-700">
+                <Card className="md:col-span-3 border-l-4 border-l-emerald-500 bg-emerald-50/30 dark:bg-emerald-500/5 overflow-hidden">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-6 p-2">
+                        <div className="flex items-center gap-6">
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-emerald-500 blur-xl opacity-20 rounded-full animate-pulse"></div>
+                                <div className="relative w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                                    <ShieldCheckIcon className="w-8 h-8" />
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black text-slate-800 dark:text-white tracking-tight">Autonomous Healing Active</h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                                    FixDesk AI has successfully self-remediated <span className="text-emerald-600 dark:text-emerald-400 font-bold">{selfHealedTickets.length} critical anomalies</span> in this workspace.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            {selfHealedTickets.slice(0, 3).map((t, i) => (
+                                <div key={i} className="hidden lg:flex flex-col p-3 bg-white dark:bg-slate-800 rounded-xl border border-emerald-100 dark:border-emerald-900/30 shadow-sm">
+                                    <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase">Self-Healed</span>
+                                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate w-32">{t.title.replace('[Self-Healing] ', '')}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </Card>
+          </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <Card className="lg:col-span-2">

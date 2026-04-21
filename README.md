@@ -8,7 +8,12 @@ Built with React, TypeScript, and Electron, FixDesk AI combines the power of web
 
 ## Features
 
-- 🤖 **AI-Powered Support**: Leverages Google Gemini AI for intelligent responses
+- 🤖 **AI-Powered Support**: Leverages Google Gemini AI for intelligent responses and automated ticketing.
+- 💬 **Global AI Assistant**: A floating widget with **Multimodal Screen-Awareness**. Capture screenshots or videos of issues for instant AI analysis and troubleshooting.
+- 🐚 **Secure IT Terminal**: A whitelisted, security-hardened terminal for admins to execute diagnostic commands (`ping`, `netstat`, `pkill`, `systemctl`, etc.).
+- 🛡️ **Autonomous Self-Healing (AIOps)**: Real-time system monitoring that detects performance bottlenecks (CPU/Memory) and autonomously mitigates them using AI-driven diagnostics and whitelisted commands.
+- 🔍 **Natural Language Search**: Filter and find tickets using plain English (e.g., "urgent vpn issues from today") via AI-powered query parsing.
+- 📊 **Support Bundle Intelligence**: Generate and analyze deep support bundles using AI to identify workspace-wide patterns and strategic risks.
 - 💻 **Cross-Platform Desktop App**: Built with Electron for Windows, macOS, and Linux
 - ⚛️ **Modern Stack**: React + TypeScript for robust, type-safe development
 - ⚡ **Fast Development**: Vite-powered build system for instant HMR
@@ -85,7 +90,21 @@ npm run electron:dev
 1. **Launch the Application**: Start the app using `npm run dev` or the built Electron app
 2. **AI Studio Integration**: Access your app through AI Studio at: [https://ai.studio/apps/drive/1XJ7hnLjKijLsWgInn1y-1ReX6jhUq4-a](https://ai.studio/apps/drive/1XJ7hnLjKijLsWgInn1y-1ReX6jhUq4-a)
 3. **Interact with AI**: Use the interface to ask questions and receive AI-powered support
-4. **Customize**: Modify components and services to fit your specific help desk needs
+4. **Admin Tools**: Switch to "Admin Mode" in the sidebar to access the **Secure IT Terminal** on the Dashboard.
+5. **Customize**: Modify components and services to fit your specific help desk needs
+
+### Secure IT Terminal & AIOps
+The terminal and autonomous healing engine are restricted to authorized admins and support a curated whitelist of commands:
+- **Network**: `ping`, `netstat`, `ifconfig`, `ipconfig`
+- **System**: `uptime`, `whoami`, `df`, `free`, `ps`, `top`
+- **Service Management**: `pkill`, `systemctl`, `journalctl`
+
+**AIOps Policy**:
+Administrators can toggle between `Manual` and `Autonomous` modes in Settings.
+- In **Autonomous** mode, FixDesk AI will automatically execute mitigation commands for detected issues and log the reasoning.
+- In **Manual** mode, the AI suggests actions that require admin approval.
+
+Security is enforced via character-based injection protection (blocking `;`, `&`, `|`, etc.) and strict command validation in the Electron main process.
 
 ## Project Structure
 

@@ -40,6 +40,7 @@ const electron_1 = require("electron");
 const path = __importStar(require("node:path"));
 const fs = __importStar(require("node:fs"));
 const robotjs_1 = __importDefault(require("robotjs"));
+const lowdb_1 = require("lowdb");
 const node_1 = require("lowdb/node");
 const child_process_1 = require("child_process");
 const generative_ai_1 = require("@google/generative-ai");
@@ -62,6 +63,37 @@ let tray = null;
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 let db;
+class EncryptedJSONAdapter {
+    constructor(filename) {
+        this.adapter = new node_1.TextFile(filename);
+    }
+    async read() {
+        const text = await this.adapter.read();
+        if (!text)
+            return null;
+        try {
+            if (electron_1.safeStorage.isEncryptionAvailable()) {
+                const decrypted = electron_1.safeStorage.decryptString(Buffer.from(text, 'base64'));
+                return JSON.parse(decrypted);
+            }
+            return JSON.parse(text);
+        }
+        catch (e) {
+            // Fallback for non-encrypted data or error
+            return JSON.parse(text);
+        }
+    }
+    async write(data) {
+        const text = JSON.stringify(data);
+        if (electron_1.safeStorage.isEncryptionAvailable()) {
+            const encrypted = electron_1.safeStorage.encryptString(text);
+            await this.adapter.write(encrypted.toString('base64'));
+        }
+        else {
+            await this.adapter.write(text);
+        }
+    }
+}
 const initDatabase = async () => {
     const defaultData = {
         tickets: [],

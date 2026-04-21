@@ -9,13 +9,17 @@ import { TicketDetail } from './components/TicketDetail';
 import { KnowledgeBase } from './components/KnowledgeBase';
 import { Settings } from './components/Settings';
 import { ReportIssueModal } from './components/ReportIssueModal';
+import { GlobalAssistant } from './components/GlobalAssistant';
 import { RemoteControlView } from './components/RemoteControlView';
 import { StartRemoteSession } from './components/StartRemoteSession';
+import { AutomationRules } from './components/AutomationRules';
+import { SecurityAuditCenter } from './components/SecurityAuditCenter';
 import { Card } from './components/common/Card';
 import { useToast } from './services/ToastContext';
 import { Ticket, Activity, Solution } from './types';
 import { BrainCircuit, ArrowUturnLeftIcon } from './components/icons/Icons';
 
+export type Page = 'dashboard' | 'tickets' | 'remote' | 'start-remote-session' | 'knowledge-base' | 'settings' | 'kb-article' | 'automation-rules' | 'security-center';
 export type Page = 'dashboard' | 'tickets' | 'remote' | 'start-remote-session' | 'knowledge-base' | 'settings' | 'kb-article';
 
 export default function App() {
@@ -35,6 +39,12 @@ export default function App() {
   const [autoLaunch, setAutoLaunch] = useState(true);
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [isSSOLoading, setIsSSOLoading] = useState(false);
+
+  const refreshTickets = useCallback(async () => {
+    const storedTickets = await window.electronAPI.getTickets();
+    setTickets(storedTickets);
+  }, []);
 
   useEffect(() => {
     // Listen for AIOps events
@@ -271,7 +281,41 @@ export default function App() {
                     >
                         Complete Setup
                     </button>
-                    <p className="text-[10px] text-slate-400">You can find your API key at <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-brand-primary hover:underline">Google AI Studio</a>.</p>
+
+                    <div className="relative my-6">
+                        <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-200 dark:border-slate-700"></span></div>
+                        <div className="relative flex justify-center text-xs uppercase"><span className="bg-white dark:bg-slate-800 px-2 text-slate-400 font-bold">Or</span></div>
+                    </div>
+
+                    <button
+                        onClick={async () => {
+                            setIsSSOLoading(true);
+                            // Simulate SSO Auth Redirect & Callback
+                            setTimeout(async () => {
+                                await window.electronAPI.updateSettings({
+                                    userName: 'Alex Smith (Enterprise)',
+                                    activeWorkspaceId: 'ENTERPRISE_DOMAIN',
+                                    role: 'staff'
+                                });
+                                setUserName('Alex Smith (Enterprise)');
+                                setActiveWorkspaceId('ENTERPRISE_DOMAIN');
+                                setRole('staff');
+                                setIsSSOLoading(false);
+                                setShowOnboarding(false);
+                                addToast('Signed in via Enterprise SSO', 'success');
+                            }, 2000);
+                        }}
+                        className="w-full py-3.5 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
+                    >
+                        {isSSOLoading ? (
+                            <div className="w-5 h-5 border-2 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                            <div className="w-5 h-5 bg-slate-800 rounded flex items-center justify-center text-[10px] text-white font-black">ID</div>
+                        )}
+                        Sign in with Enterprise SSO
+                    </button>
+
+                    <p className="text-[10px] text-slate-400 mt-4">You can find your API key at <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-brand-primary hover:underline">Google AI Studio</a>.</p>
                 </div>
             </Card>
         </div>
@@ -301,6 +345,7 @@ export default function App() {
           {renderPage()}
         </main>
       </div>
+      <GlobalAssistant />
       {isModalOpen && <ReportIssueModal onClose={() => setIsModalOpen(false)} onTicketCreated={handleCreateTicket} />}
     </div>
   );

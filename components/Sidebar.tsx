@@ -44,7 +44,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
         <div>
           <button
             onClick={onReportIssue}
-            className="w-full flex items-center justify-center gap-2 bg-brand-primary hover:bg-brand-primary/90 text-white font-semibold py-3 px-4 rounded-lg shadow-md transition-all duration-200 transform hover:scale-105"
+            className="w-full flex items-center justify-center gap-2 bg-brand-primary hover:bg-brand-secondary text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-brand-primary/25 transition-all duration-300 active:scale-95"
           >
             <ComputerDesktopIcon className="w-5 h-5" />
             Report an Issue
@@ -59,7 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
                     e.preventDefault();
                     setPage(item.page as Page);
                   }}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-base font-medium transition-colors ${
+                  className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     currentPage === item.page
                       ? 'bg-brand-primary/10 text-brand-primary'
                       : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
@@ -91,13 +91,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setPage, onReport
                             e.preventDefault();
                             setPage(item.page as Page);
                         }}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-base font-medium transition-colors ${
+                        className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                             currentPage === item.page
-                            ? 'bg-brand-primary/10 text-brand-primary'
-                            : 'text-slate-600 hover:bg-slate-100'
+                            ? 'bg-white dark:bg-slate-800 text-brand-primary shadow-sm ring-1 ring-slate-200 dark:ring-slate-700'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                         }`}
                         >
-                        <item.icon className="w-6 h-6" />
+                        <item.icon className={`w-5 h-5 transition-colors ${currentPage === item.page ? 'text-brand-primary' : 'text-slate-400 group-hover:text-slate-600'}`} />
                         {item.name}
                         </a>
                     </li>

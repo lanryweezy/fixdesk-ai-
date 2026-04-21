@@ -29,6 +29,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateSettings: (settings: any) => ipcRenderer.invoke('db-update-settings', settings),
   generateMockData: () => ipcRenderer.invoke('db-generate-mock-data'),
   exportSupportBundle: () => ipcRenderer.invoke('export-support-bundle'),
+  exportAuditReport: () => ipcRenderer.invoke('export-audit-report'),
+  getAuditLogs: () => ipcRenderer.invoke('db-get-audit-logs'),
+  getSystemDiagnostics: () => ipcRenderer.invoke('get-system-diagnostics'),
+  getAutomationRules: () => ipcRenderer.invoke('db-get-automation-rules'),
+  updateAutomationRule: (rule: any) => ipcRenderer.invoke('db-update-automation-rule', rule),
+  createAutomationRule: (rule: any) => ipcRenderer.invoke('db-create-automation-rule', rule),
+  deleteAutomationRule: (id: string) => ipcRenderer.invoke('db-delete-automation-rule', id),
+
+  // AI actions
+  aiChat: (message: string, history: any[], screenshot?: string) => ipcRenderer.invoke('ai-chat', { message, history, screenshot }),
   getSystemDiagnostics: () => ipcRenderer.invoke('get-system-diagnostics'),
 
   // AI actions
@@ -38,6 +48,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   summarizeTicket: (ticket: any) => ipcRenderer.invoke('ai-summarize-ticket', ticket),
   generateKbArticle: (ticket: any) => ipcRenderer.invoke('ai-generate-kb-article', ticket),
   getSystemHealth: (tickets: any) => ipcRenderer.invoke('ai-get-system-health', tickets),
+  rootCauseAnalysis: (ticket: any) => ipcRenderer.invoke('ai-root-cause-analysis', ticket),
+  parseSearchQuery: (query: string) => ipcRenderer.invoke('ai-parse-search-query', query),
+  semanticSearchKb: (query: string, solutions: any[]) => ipcRenderer.invoke('ai-semantic-search-kb', { query, solutions }),
+  analyzeSupportBundle: () => ipcRenderer.invoke('ai-analyze-support-bundle'),
+  startConversation: (videoBase64: string, prompt: string) => ipcRenderer.invoke('ai-start-conversation', { videoBase64, prompt }),
+  testSSO: (config: any) => ipcRenderer.invoke('auth-test-sso', config),
   startConversation: (videoBase64: string, prompt: string) => ipcRenderer.invoke('ai-start-conversation', { videoBase64, prompt }),
 
   // Event Listeners

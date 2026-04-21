@@ -15,6 +15,7 @@
   "build": {
     "appId": "com.fixdesk.ai",
     "productName": "FixDesk AI",
+    "copyright": "Copyright © 2026 FixDesk AI",
     "files": [
       "dist/",
       "dist-electron/",
@@ -23,6 +24,24 @@
     ],
     "directories": {
       "output": "release"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg"
+      ]
     }
   },
   "dependencies": {
